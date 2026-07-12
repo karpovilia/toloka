@@ -1,0 +1,4 @@
+{
+ "event_types": "data/event_types.json",
+ "conflicts": "data/conflicts.json"
+}

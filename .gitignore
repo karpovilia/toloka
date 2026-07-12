@@ -1,0 +1,14 @@
+# секреты и локальное окружение
+.env
+.env.*
+*.pem
+*.key
+.overleaf
+# инструментальные каталоги
+.claude/
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+# крупный не-публикуемый артефакт сборки (регенерируется build_conflicts.py)
+build/sites_full.jsonl

@@ -1,0 +1,95 @@
+{
+  "note": "Модель событий (таксономия) для ручной верификации. Судья размечал по СМЫСЛУ (definition), регекс — по лексическому маркеру (regex_marker). Расхождение обычно = регекс поймал маркер без смысла (FP) или смысл есть без маркера (FN).",
+  "domains": {
+    "M": {
+      "label": "math / science / puzzles (math500, gpqa_diamond, hle)",
+      "types": {
+        "backtrack": {
+          "definition": "модель отменяет/пересматривает только что сделанный шаг или вывод и возвращается назад: меняет направление, ловит свою ошибку, переосмысливает. Суть — реверс хода рассуждения.",
+          "regex_marker": "wait, / actually, / hmm, / hold on / let me reconsider / on second thought / oh wait / but wait / i was wrong / i made a mistake",
+          "example": "Wait, that gives a negative value, so the sign is wrong."
+        },
+        "verify": {
+          "definition": "модель проверяет корректность уже полученного шага/результата: пересчёт, подстановка обратно, sanity-check, проверка знака/границы/условия. Не первое вычисление, а его проверка.",
+          "regex_marker": "let me/let's/i'll/i should + check/verify/confirm/recompute/recalculate; double-check; sanity check; to verify/confirm/make sure",
+          "example": "9 - 6.4 = 2.6 > 0, so the root is real. Good."
+        },
+        "branch": {
+          "definition": "модель явно рассматривает несколько альтернатив/случаев: case 1/2, «alternatively», «either … or», разбор вариантов, отдельная ветвь.",
+          "regex_marker": "case N: / alternatively, / option N: / possibility N / scenario N / on the other hand / another approach / another way / either X or",
+          "example": "Case 2: if the discriminant is negative, there are no real roots."
+        },
+        "subgoal_done": {
+          "definition": "зафиксирован промежуточный результат подзадачи: выведена величина/фигура/лемма, завершён этап. Не финальный ответ.",
+          "regex_marker": "therefore, / thus, / hence, / so we have/get/conclude / this gives/yields / conclusion: / result: / it follows that",
+          "example": "So the circle is centered at (-3,12) with radius 9."
+        },
+        "failed_attempt": {
+          "definition": "модель признаёт, что подход/гипотеза НЕ работает: тупик, противоречие, отказ от ветки.",
+          "regex_marker": "this/that doesn't work / dead end / doesn't make sense / that's wrong/incorrect / scratch that / can't be right / that's impossible / contradiction",
+          "example": "Not equal, so the assumption a+b+c=abc fails."
+        },
+        "commit": {
+          "definition": "модель фиксирует ФИНАЛЬНЫЙ ответ задачи.",
+          "regex_marker": "the answer is / final answer: / final decision: / \\boxed{ / answer: / in conclusion, the answer",
+          "example": "Therefore the answer is 40."
+        }
+      }
+    },
+    "R": {
+      "label": "retrieval / RAG (hotpotqa, musique)",
+      "types": {
+        "retrieval_call": {
+          "definition": "модель инициирует обращение к внешнему источнику: поиск, открытие страницы, вызов инструмента.",
+          "regex_marker": "<wikipedia_search / <wikipedia_page / <web_search / <search / <tool_call / <retrieve / <fetch",
+          "example": "Let's search \"Scott Derrickson\" -> wiki page."
+        },
+        "evidence_merge": {
+          "definition": "модель интегрирует НАЙДЕННУЮ информацию в рассуждение.",
+          "regex_marker": "the search results indicate/show/say / based on the search/page/evidence / according to the page/article / the page says/states / it says:",
+          "example": "The snippet indicates he's an American filmmaker."
+        },
+        "contradiction": {
+          "definition": "найденные источники противоречат друг другу или ранее принятому выводу.",
+          "regex_marker": "however, the page/source / but this page/source / contradict(s) / conflicts with / in contrast / inconsistent / disagree",
+          "example": "However, the second page says he was born in 1959, not 1960."
+        },
+        "decomposition": {
+          "definition": "модель разбивает задачу на под-шаги/строит план.",
+          "regex_marker": "step N: / numbered list / first,/then,/next,/finally, / plan: / criteria: / approach:",
+          "example": "We need to find the director first, then his birth year."
+        },
+        "query_rewrite": {
+          "definition": "модель переформулирует/повторяет поисковый запрос.",
+          "regex_marker": "let me try to search/find/look / search again / another/different search / refine/reformulate/rephrase the query / try a different spelling",
+          "example": "That wasn't specific enough — let me search for the full name."
+        },
+        "commit": {
+          "definition": "фиксация ФИНАЛЬНОГО ответа.",
+          "regex_marker": "based on the evidence/results / the answer is / final answer: / therefore, the answer / \"concise_answer\"",
+          "example": "Based on the evidence, both are American, so: yes."
+        },
+        "backtrack": {
+          "definition": "реверс/пересмотр только что сделанного шага или вывода (необязательно «wait»).",
+          "regex_marker": "wait, / actually, / hmm, / but wait / i was wrong / i made a mistake (те же, что в M)",
+          "example": "Actually that page was about a different person."
+        },
+        "verify": {
+          "definition": "проверка корректности уже полученного факта/шага, перепроверка через источник.",
+          "regex_marker": "let me verify/confirm/double-check / to make sure / sanity check",
+          "example": "Let me verify Scott Derrickson is indeed American by reopening the page."
+        },
+        "internal_use": {
+          "definition": "модель опирается на ВНУТРЕННЕЕ знание (память из весов) или гипотезу вместо grounding в извлечённых данных.",
+          "regex_marker": "maybe/perhaps/possibly / it seems/appears / might/may be / i recall/remember / iirc/afaik / 'X was born in YYYY' / which one — could be multiple",
+          "example": "Ed Wood, presumably an American filmmaker born 1924."
+        },
+        "retrieval_inadequate": {
+          "definition": "извлечение не дало нужного: пусто, не по делу, не хватает деталей.",
+          "regex_marker": "no results / search didn't return / not specific/helpful/useful enough / doesn't include/mention / truncated / wrong page / empty extract",
+          "example": "The snippet doesn't mention his nationality."
+        }
+      }
+    }
+  }
+}
