@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toloka — адъюдикация конфликтов разметки (regex / Claude / DeepSeek / Qwen)</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">Toloka<span class="sub">conflict adjudication</span></div>
+
+  <div class="loaders">
+    <label>аннотатор:
+      <input type="text" id="annotatorId" size="8" placeholder="ki"></label>
+    <span class="sep">|</span>
+    <label class="btn file">импорт разметки
+      <input type="file" id="importAnnot" accept=".json" multiple hidden></label>
+    <button class="btn" id="exportAnnot" title="выгрузить свою разметку одним файлом">экспорт разметки</button>
+    <span id="progress" class="progress"></span>
+  </div>
+
+  <nav class="nav">
+    <button class="btn" id="prevBtn" title="k / ←">◀</button>
+    <span id="posLabel" class="pos">–/–</span>
+    <button class="btn" id="nextBtn" title="j / →">▶</button>
+  </nav>
+</header>
+
+<div id="main">
+  <aside id="listPane">
+    <div class="filters">
+      <input type="search" id="textSearch" placeholder="поиск: цитата / тип / заметка…">
+      <div class="frow">
+        <select id="fSlice">
+          <option value="">все срезы</option>
+          <option value="A">A · regex+Claude+DeepSeek</option>
+          <option value="B">B · regex+Qwen</option>
+        </select>
+        <select id="fBench"><option value="">все бенчи</option></select>
+      </div>
+      <div class="frow">
+        <select id="fPrio">
+          <option value="">любой приоритет</option>
+          <option value="4">4 · type_mismatch LLM</option>
+          <option value="3">3 · presence-split LLM</option>
+          <option value="2">2 · LLM vs regex</option>
+          <option value="1">1 · одиночное / regex-only</option>
+        </select>
+        <select id="fType"><option value="">любой тип события</option></select>
+      </div>
+      <div class="frow">
+        <select id="fMine">
+          <option value="">моя разметка: любая</option>
+          <option value="unann">не размечено мной</option>
+          <option value="ann">размечено мной</option>
+        </select>
+        <select id="fAgent"><option value="">любой агент участвует</option></select>
+      </div>
+      <div class="fcount" id="filterCount"></div>
+    </div>
+    <ul id="exampleList"></ul>
+  </aside>
+
+  <section id="center">
+    <div id="qLabel" class="qlabel"></div>
+    <div class="ctxbar">
+      <span>контекст ±<span id="ctxUnit">сегм.</span></span>
+      <input type="number" id="ctxRadius" value="8" min="0" max="60" step="1">
+      <button class="btn small" id="toFocus" title="к спорному сегменту">↻ фокус</button>
+    </div>
+    <div id="traceBody"></div>
+  </section>
+
+  <aside id="rightPane">
+    <div class="focusbox">
+      <div class="focushead">сайт: <span id="focusSeg">–</span></div>
+      <div id="focusText" class="focustext"></div>
+    </div>
+    <div id="agents"></div>
+    <div id="verdict"></div>
+    <div id="myDecisions"></div>
+  </aside>
+</div>
+
+<div id="toast" class="hidden"></div>
+<script src="app.js"></script>
+</body>
+</html>

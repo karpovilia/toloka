@@ -1,0 +1,22 @@
+{
+ "traces_processed": 2162,
+ "sites_total": 196247,
+ "sites_in_viewer": 6000,
+ "by_priority": {
+  "prio3": 66382,
+  "prio2": 4447,
+  "prio1": 113910,
+  "prio4": 11508
+ },
+ "per_agent_site_participation": {
+  "regex": 196247,
+  "claude": 188019,
+  "deepseek": 188019,
+  "qwen": 8228
+ },
+ "slices": {
+  "A_regex_claude_deepseek": 1693,
+  "B_regex_qwen": 485
+ },
+ "note": "4-way на общих трассах отсутствует; см. README"
+}
