@@ -1,4 +1,5 @@
 {
  "event_types": "data/event_types.json",
- "conflicts": "data/conflicts.json"
+ "conflicts": "data/conflicts.json",
+ "traces_dir": "data/traces"
 }

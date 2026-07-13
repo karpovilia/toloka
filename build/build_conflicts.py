@@ -335,8 +335,12 @@ def main():
                         break
     top.sort(key=lambda s: (-s["priority"], s["slice"], s["cell"], s["question_id"], s["seg_id"]))
 
-    # встроенный context_window ±radius (self-contained; пофайловые трассы не публикуем)
+    # встроенный context_window ±radius (мгновенная отрисовка) + слим-трасса целиком
+    # (data/traces/<cell>__<qid>.json, segments) для ленивой подгрузки контекста по скроллу.
+    outtr = os.path.join(outdata, "traces")
+    os.makedirs(outtr, exist_ok=True)
     payload_cache = {}
+    written = set()
     for s in top:
         mshort = {v: k for k, v in MODEL_FULL.items()}.get(s["model"], s["model"])
         pp = payload_for(mshort, s["benchmark"], s["question_id"])
@@ -346,6 +350,15 @@ def main():
         segs_by_id = {seg["seg_id"]: seg["text"] for seg in pay["segments"]}
         s["context_window"] = window(segs_by_id, s["seg_id"], args.radius)
         s["n_segments"] = len(pay["segments"])
+        s["trace_file"] = f"{s['cell']}__{san_qid(s['question_id'])}.json"
+        tpath = os.path.join(outtr, s["trace_file"])
+        if s["trace_file"] not in written and not os.path.exists(tpath):
+            json.dump({"cell": s["cell"], "question_id": s["question_id"],
+                       "benchmark": s["benchmark"], "domain": s["domain"],
+                       "question": pay.get("question", ""),
+                       "segments": [{"seg_id": seg["seg_id"], "text": seg["text"]} for seg in pay["segments"]]},
+                      open(tpath, "w"), ensure_ascii=False)
+        written.add(s["trace_file"])
 
     json.dump(top, open(os.path.join(outdata, "conflicts.json"), "w"), ensure_ascii=False)
 
