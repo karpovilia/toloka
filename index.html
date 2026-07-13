@@ -18,7 +18,21 @@
     <label class="btn file">импорт разметки
       <input type="file" id="importAnnot" accept=".json" multiple hidden></label>
     <button class="btn" id="exportAnnot" title="выгрузить свою разметку одним файлом">экспорт разметки</button>
+    <button class="btn" id="ghBtn" title="сохранить разметку коммитом в GitHub">💾 GitHub</button>
     <span id="progress" class="progress"></span>
+  </div>
+
+  <div id="ghPanel" class="ghpanel hidden">
+    <div class="ghrow"><label>owner<input id="ghOwner" placeholder="karpovilia"></label>
+      <label>repo<input id="ghRepo" placeholder="toloka"></label></div>
+    <div class="ghrow"><label>branch<input id="ghBranch" placeholder="main" size="6"></label>
+      <label>path<input id="ghPath" placeholder="annotations" size="10"></label></div>
+    <div class="ghrow"><label>token (fine-grained PAT, contents:write)<input id="ghToken" type="password" placeholder="github_pat_…"></label></div>
+    <div class="ghrow">
+      <button class="btn" id="ghSaveCfg">сохранить настройки</button>
+      <button class="btn primary" id="ghCommit">коммитить разметку</button>
+    </div>
+    <div class="ghnote">Токен хранится только в этом браузере (localStorage) и уходит напрямую в api.github.com. Для приватного репо нужен PAT с доступом к нему. Файл: <code>&lt;path&gt;/annot_&lt;ник&gt;.json</code>.</div>
   </div>
 
   <nav class="nav">
@@ -66,8 +80,9 @@
   <section id="center">
     <div id="qLabel" class="qlabel"></div>
     <div class="ctxbar">
-      <span>контекст ±<span id="ctxUnit">сегм.</span></span>
-      <input type="number" id="ctxRadius" value="8" min="0" max="60" step="1">
+      <span>окно ±</span>
+      <input type="number" id="ctxRadius" value="12" min="0" max="60" step="1">
+      <span>сегм. · листай — подгрузит больше</span>
       <button class="btn small" id="toFocus" title="к спорному сегменту">↻ фокус</button>
     </div>
     <div id="traceBody"></div>

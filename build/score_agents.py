@@ -57,20 +57,44 @@ def load_annotations(anndir):
     return per_item, sorted(annotators)
 
 
+def normverd(v):
+    """Вердикт разметчика -> отсортированный список типов (мультиселект).
+    Легаси-строка оборачивается; пустое/None -> []."""
+    if v is None:
+        return []
+    if isinstance(v, str):
+        v = [v]
+    return sorted(x for x in v if x)
+
+
+def canon(v):
+    """Канонический ярлык вердикта для κ (одна категория на разметчика)."""
+    return "+".join(normverd(v))
+
+
 def majority(votes):
-    """votes: dict annotator->verdict. Возвращает (gold, n_effective, agreed_bool)."""
-    vals = [v for v in votes.values() if v != UNCLEAR]
-    if not vals:
+    """votes: dict annotator->verdict(список|строка). Возвращает (gold_set, n_eff, agreed).
+    gold_set — множество типов (мультилейбл) по типово-мажоритарному правилу, либо [NONE]."""
+    norm = [normverd(v) for v in votes.values()]
+    norm = [v for v in norm if v and v != [UNCLEAR]]   # выкинуть unclear/пустые
+    if not norm:
         return None, 0, None
-    c = Counter(vals)
-    top, n = c.most_common(1)[0]
-    return top, len(vals), (n == len(vals))
+    n = len(norm)
+    none_cnt = sum(1 for v in norm if v == [NONE])
+    supp = Counter(t for v in norm for t in v if t != NONE)
+    gold = [t for t, c in supp.items() if 2 * c >= n]   # тип в gold, если поддержан ≥ половиной
+    if none_cnt * 2 >= n and none_cnt >= (max(supp.values()) if supp else 0):
+        gold = [NONE]
+    if not gold:                                        # разнобой без большинства — берём модальный вердикт
+        gold = normverd(Counter(canon(v) for v in norm).most_common(1)[0][0].split("+"))
+    agreed = len({canon(v) for v in norm}) == 1
+    return sorted(gold), n, agreed
 
 
-def agent_correct(agent_answer, gold):
-    if gold == NONE:
+def agent_correct(agent_answer, gold_set):
+    if gold_set == [NONE]:
         return agent_answer == [NONE]
-    return gold in agent_answer
+    return any(t in gold_set for t in agent_answer)
 
 
 def cohen_kappa(pairs, labels):
@@ -216,16 +240,17 @@ def main():
             acc_tot[ag] += 1
             if correct:
                 acc_hit[ag] += 1
-            # per-type detection (тип != NONE)
+            # per-type detection (мультилейбл gold; тип != NONE)
             for t in ans:
                 if t == NONE:
                     continue
-                if t == gold:
+                if t in gold:
                     type_tp[(ag, t)] += 1
                 else:
                     type_fp[(ag, t)] += 1
-            if gold != NONE and gold not in ans:
-                type_fn[(ag, gold)] += 1
+            for g in gold:
+                if g != NONE and g not in ans:
+                    type_fn[(ag, g)] += 1
 
     agent_scores = {}
     for ag in AGENTS:
@@ -246,21 +271,24 @@ def main():
 
     # ---- межаннотаторное согласие ----
     iaa = {"n_annotators": n_ann_files, "annotators": annotators}
-    shared = {i: v for i, v in per_item.items() if len([x for x in v.values() if x != UNCLEAR]) >= 2 and i in by_id}
+    def valid(v):  # нормализованный ярлык вердикта или None (для unclear/пустых)
+        c = canon(v)
+        return c if c and c != UNCLEAR else None
+    shared = {i: v for i, v in per_item.items() if sum(1 for x in v.values() if valid(x)) >= 2 and i in by_id}
     if n_ann_files == 2:
         a0, a1 = annotators
         pairs = []
         labels = set()
         for v in shared.values():
-            if a0 in v and a1 in v and v[a0] != UNCLEAR and v[a1] != UNCLEAR:
-                pairs.append((v[a0], v[a1])); labels.update([v[a0], v[a1]])
+            if a0 in v and a1 in v and valid(v[a0]) and valid(v[a1]):
+                pairs.append((valid(v[a0]), valid(v[a1]))); labels.update([valid(v[a0]), valid(v[a1])])
         iaa["cohen_kappa"] = cohen_kappa(pairs, labels)
         iaa["n_pairs"] = len(pairs)
-        iaa["note"] = "Cohen κ применим ровно к 2 разметчикам"
+        iaa["note"] = "Cohen κ применим ровно к 2 разметчикам; мультиселект-вердикт = одна категория (сортированный набор типов)"
     elif n_ann_files >= 3:
         rows, labels = [], set()
         for v in shared.values():
-            vals = [x for x in v.values() if x != UNCLEAR]
+            vals = [valid(x) for x in v.values() if valid(x)]
             if len(vals) == n_ann_files:
                 rows.append(Counter(vals)); labels.update(vals)
         iaa["fleiss_kappa"] = fleiss_kappa(rows, labels)
