@@ -53,6 +53,11 @@ setTimeout(() => {
   const names = $$("#agents .aname").map(e => e.textContent);
   ok(names.length === 3 && names.includes("Claude") && names.includes("DeepSeek"), "3 карточки агентов: " + names.join(","));
   ok($$("#agents .atype").length >= 3, "типы на карточках отрисованы: " + $$("#agents .atype").length);
+  // провенанс: backtrack -> ReasonOps (.ro), failed_attempt -> наш (.ours)
+  const roTxt = $$("#agents .atype.ro").map(e => e.textContent);
+  const oursTxt = $$("#agents .atype.ours").map(e => e.textContent);
+  ok(roTxt.includes("backtrack"), "ReasonOps-рамка на backtrack: " + roTxt.join(","));
+  ok(oursTxt.includes("failed_attempt"), "наша рамка на failed_attempt: " + oursTxt.join(","));
 
   // 3) МУЛЬТИСЕЛЕКТ: жмём 1 и 2 -> два типа в вердикте (массив)
   const cands = $$("#verdict .vbtn.cand").map(b => b.textContent);

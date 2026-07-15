@@ -17,6 +17,19 @@ const PALETTE = ["#e5484d", "#30a46c", "#8e4ec6", "#0091ff", "#f76b15", "#ffb224
 const NONE = "∅", UNCLEAR = "unclear";
 const CHUNK = 20, EDGE = 140; // догрузка контекста по скроллу
 
+// Провенанс типов события. ReasonOps (Gandhi/Stanford) описывает 7 дискурсивных операторов;
+// наши типы события — отдельная таксономия. Ниже — семантическое соответствие наших типов
+// операторам ReasonOps: помеченные считаются «стенфордскими» (рамка-пилюля), остальные — наши
+// (прямоугольная пунктирная рамка). РЕДАКТИРУЙ этот словарь, если разбивка другая.
+const REASONOPS_OP = {
+  backtrack: "BACKTRACKING", verify: "CONSTRAINING", branch: "HYPOTHESIZING",
+  subgoal_done: "INFERRING", decomposition: "INITIATING", evidence_merge: "GROUNDING",
+  internal_use: "QUALIFYING",
+};
+const isReasonOps = (t) => Object.prototype.hasOwnProperty.call(REASONOPS_OP, t);
+const provClass = (t) => (t === NONE || t === UNCLEAR) ? "" : (isReasonOps(t) ? " ro" : " ours");
+const provTitle = (t) => isReasonOps(t) ? "ReasonOps: " + REASONOPS_OP[t] : (t === NONE || t === UNCLEAR ? "" : "наш тип");
+
 const S = {
   model: null, items: [], filtered: [], idx: 0,
   annotatorId: localStorage.getItem("tv_last_annotator") || "ki",
@@ -225,7 +238,7 @@ function renderAgents(it) {
     const head = el("div", "ahead");
     const nm = el("span", "aname", AGENT_LABEL[a] || a); nm.style.color = AGENT_COLOR[a]; head.appendChild(nm);
     const tw = el("span", "atypes");
-    for (const t of types) { const tt = el("span", "atype", t); const c = typeColor(t); tt.style.background = c; tt.style.color = contrast(c); tw.appendChild(tt); }
+    for (const t of types) { const tt = el("span", "atype" + provClass(t), t); tt.title = provTitle(t); const c = typeColor(t); tt.style.background = c; tt.style.color = contrast(c); tw.appendChild(tt); }
     head.appendChild(tw);
     if (st) head.appendChild(el("span", "averdict", st === "match" ? "✅" : "❌"));
     card.appendChild(head);
@@ -249,7 +262,8 @@ function renderVerdict(it) {
 
   const cand = el("div", "vbtns");
   asserted.forEach((t, i) => {
-    const b = el("button", "vbtn cand" + (vs.includes(t) ? " sel" : ""), (i < 9 ? (i + 1) + " · " : "") + t);
+    const b = el("button", "vbtn cand" + provClass(t) + (vs.includes(t) ? " sel" : ""), (i < 9 ? (i + 1) + " · " : "") + t);
+    b.title = provTitle(t);
     b.onclick = () => toggleVerdict(it, t); cand.appendChild(b);
   });
   box.appendChild(cand);

@@ -80,6 +80,13 @@ mark{border-radius:3px;padding:0 1px}
 .aname{font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.4px}
 .atypes{display:flex;gap:5px;flex-wrap:wrap}
 .atype{font-size:11px;padding:1px 7px;border-radius:10px}
+/* провенанс типа: ReasonOps — скруглённая пилюля; наш — прямоугольник с пунктирной рамкой */
+.atype.ro{border-radius:10px}
+.atype.ours{border-radius:2px;outline:1.5px dashed currentColor;outline-offset:1px}
+.vbtn.ro{border-radius:6px}
+.vbtn.ours{border-radius:2px;border-style:dashed}
+.typelegend{display:flex;gap:10px;align-items:center;margin-bottom:8px;color:var(--muted);font-size:11px}
+.typelegend .atype{background:var(--panel2);color:var(--muted)}
 .averdict{margin-left:auto;font-size:14px}
 .aquote{color:var(--muted);font-size:12px;margin-top:3px}
 .aquote b{color:var(--fg);font-weight:400}
