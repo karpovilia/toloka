@@ -8,6 +8,7 @@
    Разметка в localStorage (tv_annot::<annotator>); сохранение: файлом или коммитом в GitHub. */
 
 const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
 const AGENT_COLOR = { regex: "#f76b15", claude: "#d97757", deepseek: "#4c8dff", qwen: "#8e4ec6" };
@@ -210,14 +211,83 @@ function gutter(id, m) {
 
 function segRow(id, text, it, focusSet, m) {
   const focus = focusSet.has(id);
-  const row = el("div", "seg" + (focus ? " focus" : "")); row.dataset.segId = id;
-  row.appendChild(gutter(id, m));
+  const row = el("div", "seg" + (focus ? " focus" : "") + (id === S.cursorSeg ? " cursor" : "")); row.dataset.segId = id;
+  const g = gutter(id, m);
+  if (m) { g.style.cursor = "pointer"; g.title = "клик — распределение λ по типам + перейти сюда"; g.onclick = (e) => { e.stopPropagation(); jumpToSeg(it, id); drill(it, id, e); }; }
+  row.appendChild(g);
   row.appendChild(el("div", "sid", String(id)));
   const txt = el("div", "stext");
   if (focus) txt.innerHTML = highlight(text, it); else txt.textContent = text;
   row.appendChild(txt); return row;
 }
 function segSource(it) { const tr = S.traces[it.trace_file]; return (tr && tr.segments) ? tr.segments : (it.context_window || []); }
+
+/* ---------- drill-down: распределение λ по типам в точке ---------- */
+function lamByType(it, seg) {
+  const P = S.mapMeta && S.mapMeta.hawkes_by_type; const tr = S.traces[it.trace_file];
+  if (!P || !tr) return null;
+  const byT = {};
+  for (const e of (tr.events || [])) (byT[e.t] = byT[e.t] || []).push(e.s);
+  const out = [];
+  for (const t in P) {
+    const p = P[t]; let exc = 0;
+    for (const ti of (byT[t] || [])) if (ti < seg) exc += Math.exp(-p.beta * (seg - ti));
+    out.push({ type: t, lam: p.mu + p.alpha * p.beta * exc, hasEv: (byT[t] || []).some(x => x <= seg) });
+  }
+  out.sort((a, b) => b.lam - a.lam);
+  return out;
+}
+function closeDrill() { const d = $("#drillpop"); if (d) d.remove(); }
+function drill(it, seg, evt) {
+  closeDrill();
+  const dist = lamByType(it, seg); if (!dist) return;
+  const tot = dist.reduce((a, b) => a + b.lam, 0);
+  const max = Math.max(...dist.map(d => d.lam), 1e-6);
+  const pop = el("div", "drillpop"); pop.id = "drillpop";
+  pop.appendChild(el("div", "dh", `сегмент ${seg} · Σλ = ${tot.toFixed(2)} · распределение по типам`));
+  for (const d of dist) {
+    if (d.lam < 1e-3 && !d.hasEv) continue;
+    const row = el("div", "drow");
+    const nm = el("span", "dtype" + provClass(d.type), d.type); const c = typeColor(d.type); nm.style.color = c;
+    row.appendChild(nm);
+    const bw = el("span", "dbarwrap"); const bar = el("span", "dbar");
+    bar.style.width = (3 + 92 * d.lam / max).toFixed(0) + "px"; bar.style.background = c;
+    bw.appendChild(bar); row.appendChild(bw);
+    row.appendChild(el("span", "dval", d.lam.toFixed(3)));
+    pop.appendChild(row);
+  }
+  document.body.appendChild(pop);
+  const x = Math.min((evt ? evt.clientX : 200) + 10, window.innerWidth - 250);
+  const y = Math.min((evt ? evt.clientY : 120) + 4, window.innerHeight - pop.offsetHeight - 12);
+  pop.style.left = Math.max(6, x) + "px"; pop.style.top = Math.max(6, y) + "px";
+}
+
+/* ---------- навигация по событиям внутри трассы ---------- */
+function eventSegs(it) { const tr = S.traces[it.trace_file]; return (tr && tr.events) ? [...new Set(tr.events.map(e => e.s))].sort((a, b) => a - b) : []; }
+function jumpToSeg(it, seg) {
+  if (!S.wholeTrace && S.view && (seg < S.view.lo || seg > S.view.hi)) {
+    S.view.lo = Math.max(S.view.minId, Math.min(S.view.lo, seg - 3));
+    S.view.hi = Math.min(S.view.maxId, Math.max(S.view.hi, seg + 3));
+    renderContext(it, false);
+  }
+  const row = $('#traceBody .seg[data-seg-id="' + seg + '"]');
+  if (row) {
+    $$('#traceBody .seg.cursor').forEach(r => r.classList.remove("cursor"));
+    row.classList.add("cursor"); if (row.scrollIntoView) row.scrollIntoView({ block: "center" });
+  }
+  S.cursorSeg = seg;
+}
+function gotoEvent(it, dir) {
+  const segs = eventSegs(it); if (!segs.length) { toast("на трассе нет событий"); return; }
+  const cur = S.cursorSeg == null ? it.seg_id : S.cursorSeg;
+  let idx = segs.indexOf(cur);
+  if (idx < 0) {
+    idx = dir > 0 ? segs.findIndex(s => s > cur) : [...segs].reverse().findIndex(s => s < cur);
+    if (dir < 0 && idx >= 0) idx = segs.length - 1 - idx;
+    if (idx < 0) idx = dir > 0 ? 0 : segs.length - 1;
+  } else idx = (idx + dir + segs.length) % segs.length;
+  jumpToSeg(it, segs[idx]);
+}
 
 function renderContext(it, fresh) {
   const body = $("#traceBody");
@@ -280,7 +350,7 @@ function renderItem() {
   $("#focusSeg").textContent = `s${it.seg_id}` + (it.segs && it.segs.length > 1 ? ` (сегм. ${it.segs.join(",")})` : "");
   const focusSet = new Set(it.segs || [it.seg_id]);
   $("#focusText").textContent = (segSource(it)).filter(s => focusSet.has(s.seg_id)).map(s => s.text).join(" ⏎ ");
-  renderAgents(it); renderVerdict(it); renderMy(it);
+  renderAgents(it); renderVerdict(it); renderMy(it); updateHash();
 }
 
 function renderAgents(it) {
@@ -363,6 +433,48 @@ function renderMy(it) {
   for (const p of S.pool) { const pr = p.annotations?.[it.item_id]; if (recDone(pr)) { const d = el("div", "mydec"); d.style.borderColor = "#8e4ec6"; d.textContent = `👤 ${p.annotator_id}: ${vset(pr).join("+")}${pr.notes ? " · " + pr.notes : ""}`; box.appendChild(d); } }
 }
 
+/* ---------- deep-linking через URL-хэш ---------- */
+function parseHash() {
+  const p = {};
+  for (const kv of location.hash.replace(/^#/, "").split("&")) {
+    const i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1));
+  }
+  return p;
+}
+function updateHash() {
+  const it = currentItem(); if (!it) return;
+  let h = "#item=" + encodeURIComponent(it.item_id);
+  if (S.wholeTrace) h += "&whole=1";
+  if (h !== S._lastHash) { S._lastHash = h; try { history.replaceState(null, "", h); } catch { location.hash = h; } }
+}
+function selectItemById(id, opts = {}) {
+  const idx = S.items.findIndex(x => x.item_id === id);
+  if (idx < 0) { toast("сайт из ссылки не найден в наборе"); return false; }
+  ["fSlice", "fBench", "fPrio", "fType", "fMine", "fAgent"].forEach(s => { const e = $("#" + s); if (e) e.value = ""; });
+  $("#textSearch").value = "";
+  if (opts.whole) { S.wholeTrace = true; $("#wholeBtn").classList.add("on"); }
+  applyFilters();
+  const pos = S.filtered.indexOf(idx);
+  if (pos >= 0) { S.idx = pos; renderList(); renderItem(); }
+  return true;
+}
+function applyHash(p) {
+  p = p || parseHash();
+  if (p.item) return selectItemById(p.item, { whole: p.whole === "1" });
+  if (p.trace) {
+    const it = S.items.find(x => x.trace_file === p.trace || (x.cell + "|" + x.question_id) === p.trace);
+    if (it) return selectItemById(it.item_id, { whole: true });
+    toast("трасса из ссылки не найдена");
+  }
+  return false;
+}
+function shareLink() {
+  updateHash();
+  const url = location.href;
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast("ссылка скопирована"), () => toast(url));
+  else toast(url);
+}
+
 /* ---------- export / import / GitHub ---------- */
 function annotPayload() { return { annotator_id: S.annotatorId, exported: new Date().toISOString(), tool: "toloka", annotations: S.myAnnot }; }
 function download(name, obj) { const blob = new Blob([JSON.stringify(obj, null, 1)], { type: "application/json" }); const a = el("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href); }
@@ -398,6 +510,8 @@ function bind() {
   $("#annotatorId").onchange = () => { S.annotatorId = $("#annotatorId").value.trim() || "anon"; localStorage.setItem("tv_last_annotator", S.annotatorId); loadMyAnnot(); applyFilters(); toast("аннотатор: " + S.annotatorId); };
   $("#importAnnot").onchange = ev => { for (const f of ev.target.files) { const r = new FileReader(); r.onload = () => { try { const j = JSON.parse(r.result); if (j.annotator_id === S.annotatorId) { Object.assign(S.myAnnot, j.annotations || {}); saveMyAnnot(); toast("загружена МОЯ разметка"); } else { S.pool = S.pool.filter(p => p.annotator_id !== j.annotator_id); S.pool.push(j); toast("подключена разметка: " + j.annotator_id); } applyFilters(); } catch { toast("не JSON"); } }; r.readAsText(f); } };
   $("#exportAnnot").onclick = () => download(`annot_${S.annotatorId}.json`, annotPayload());
+  $("#shareBtn").onclick = shareLink;
+  window.addEventListener("hashchange", () => { if (location.hash !== S._lastHash) applyHash(); });
   // GitHub-панель
   $("#ghBtn").onclick = () => $("#ghPanel").classList.toggle("hidden");
   const g = ghCfg();
@@ -410,6 +524,10 @@ function bind() {
   $("#toFocus").onclick = () => renderItem();
   $("#ctxRadius").onchange = () => renderItem();
   $("#wholeBtn").onclick = () => { S.wholeTrace = !S.wholeTrace; $("#wholeBtn").classList.toggle("on", S.wholeTrace); renderItem(); };
+  $("#prevEv").onclick = () => { const it = currentItem(); if (it) gotoEvent(it, -1); };
+  $("#nextEv").onclick = () => { const it = currentItem(); if (it) gotoEvent(it, 1); };
+  $("#traceBody").addEventListener("scroll", closeDrill);
+  document.addEventListener("click", closeDrill);
   $("#traceBody").addEventListener("scroll", () => { if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   ["textSearch", "fSlice", "fBench", "fPrio", "fType", "fMine", "fAgent"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
   document.addEventListener("keydown", ev => {
@@ -419,18 +537,22 @@ function bind() {
     else if (ev.key === "k" || ev.key === "ArrowLeft") go(-1);
     else if (ev.key === "0") toggleVerdict(it, NONE);
     else if (ev.key === "u") toggleVerdict(it, UNCLEAR);
+    else if (ev.key === "n") gotoEvent(it, 1);
+    else if (ev.key === "p") gotoEvent(it, -1);
     else if (/^[1-9]$/.test(ev.key)) { const t = siteTypes(it)[parseInt(ev.key) - 1]; if (t) toggleVerdict(it, t); }
   });
 }
-function go(d) { if (!S.filtered.length) return; S.idx = (S.idx + d + S.filtered.length) % S.filtered.length; renderList(); renderItem(); }
+function go(d) { if (!S.filtered.length) return; S.idx = (S.idx + d + S.filtered.length) % S.filtered.length; S.cursorSeg = null; renderList(); renderItem(); }
 
 /* ---------- init ---------- */
 (async function init() {
   bind(); loadMyAnnot();
+  const boot = parseHash();   // считать входящий hash ДО первого рендера (setData его перезапишет)
   const cfgTxt = await tryFetch("config.json");
   S.cfg = cfgTxt ? JSON.parse(cfgTxt) : { event_types: "data/event_types.json", conflicts: "data/conflicts.json", traces_dir: "data/traces" };
   const mm = await tryFetch(S.cfg.trace_maps_meta || "data/trace_maps_meta.json"); if (mm) try { S.mapMeta = JSON.parse(mm); } catch {}
   const m = await tryFetch(S.cfg.event_types); if (m) try { setModel(JSON.parse(m)); } catch (e) { toast("event_types: " + e.message); }
   const d = await tryFetch(S.cfg.conflicts); if (d) try { setData(JSON.parse(d)); } catch (e) { toast("conflicts: " + e.message); }
   if (!d) toast("не удалось загрузить conflicts.json");
+  if (boot.item || boot.trace) applyHash(boot);   // навигация по входящей ссылке
 })();
