@@ -355,11 +355,28 @@ function lamByType(seg) {
 }
 function closeDrill() { const d = $("#drillpop"); if (d) d.remove(); }
 function drill(seg, evt) {
-  closeDrill(); const dist = lamByType(seg); if (!dist) return;
-  const tot = dist.reduce((a, b) => a + b.lam, 0), max = Math.max(...dist.map(d => d.lam), 1e-6);
+  closeDrill();
+  const m = traceMap(); const op = m ? m.op.get(seg) : null;
   const pop = el("div", "drillpop"); pop.id = "drillpop";
-  pop.appendChild(el("div", "dh", `сегмент ${seg} · Σλ = ${tot.toFixed(2)} · по типам`));
-  for (const d of dist) { if (d.lam < 1e-3 && !d.hasEv) continue; const row = el("div", "drow"); const nm = el("span", "dtype" + provClass(d.type), d.type); nm.style.color = typeColor(d.type); row.appendChild(nm); const bw = el("span", "dbarwrap"), bar = el("span", "dbar"); bar.style.width = (3 + 92 * d.lam / max).toFixed(0) + "px"; bar.style.background = typeColor(d.type); bw.appendChild(bar); row.appendChild(bw); row.appendChild(el("span", "dval", d.lam.toFixed(3))); pop.appendChild(row); }
+  // какой операторный спан идёт в этой точке
+  const head = el("div", "dh", `сегмент ${seg}`);
+  pop.appendChild(head);
+  const opline = el("div", "dop");
+  if (op) {
+    opline.appendChild(el("span", "dopl", "спан: "));
+    const chip = el("span", "opchip", op); chip.style.background = OP_COLOR[op] || "#333"; chip.style.color = contrast(OP_COLOR[op] || "#333");
+    opline.appendChild(chip);
+    // границы спана
+    const sp = (S.trace && S.trace.spans || []).find(s => seg >= s.a && seg < s.b);
+    if (sp) opline.appendChild(el("span", "dopr", ` (сегм. ${sp.a}–${sp.b - 1})`));
+  } else opline.appendChild(el("span", "dopl", "спан: —"));
+  pop.appendChild(opline);
+  const dist = lamByType(seg);
+  if (dist) {
+    const tot = dist.reduce((a, b) => a + b.lam, 0), max = Math.max(...dist.map(d => d.lam), 1e-6);
+    pop.appendChild(el("div", "dsub", `Σλ = ${tot.toFixed(2)} · интенсивность по типам`));
+    for (const d of dist) { if (d.lam < 1e-3 && !d.hasEv) continue; const row = el("div", "drow"); const nm = el("span", "dtype" + provClass(d.type), d.type); nm.style.color = typeColor(d.type); row.appendChild(nm); const bw = el("span", "dbarwrap"), bar = el("span", "dbar"); bar.style.width = (3 + 92 * d.lam / max).toFixed(0) + "px"; bar.style.background = typeColor(d.type); bw.appendChild(bar); row.appendChild(bw); row.appendChild(el("span", "dval", d.lam.toFixed(3))); pop.appendChild(row); }
+  }
   document.body.appendChild(pop);
   const x = Math.min((evt ? evt.clientX : 200) + 10, window.innerWidth - 250), y = Math.min((evt ? evt.clientY : 120) + 4, window.innerHeight - pop.offsetHeight - 12);
   pop.style.left = Math.max(6, x) + "px"; pop.style.top = Math.max(6, y) + "px";
