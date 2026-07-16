@@ -60,6 +60,15 @@ setTimeout(() => {
   if (gut) gut.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 80, clientY: 80 }));
   const opchip = $("#drillpop .opchip");
   ok(opchip && opchip.textContent === "DERIVING", "клик по карте показал спан: " + (opchip ? opchip.textContent : "нет"));
+  // ссылка на строку: клик по номеру строки -> hash seg= + подсветка linked
+  const sid5 = $('#traceBody .seg[data-seg-id="5"] .sid');
+  if (sid5) sid5.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  ok(window.location.hash.includes("seg=5"), "ссылка на строку: hash = " + window.location.hash);
+  ok($('#traceBody .seg[data-seg-id="5"]').classList.contains("linked"), "строка 5 подсвечена linked");
+  // сворачивание левого списка
+  $("#listToggle").click();
+  ok($("#main").classList.contains("nolist"), "левый список свёрнут");
+  $("#listToggle").click();
   // 3) подтверждаем первое (клавиша 1) -> вердикт ✓ записан, прогресс
   key("1");
   const a1 = JSON.parse(store.getItem("tv_annot::ki") || "{}");

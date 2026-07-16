@@ -203,3 +203,10 @@ mark{border-radius:3px;padding:0 1px}
 .drillpop .opchip{border-radius:8px;padding:1px 8px;font-size:10px;font-weight:600}
 .drillpop .dopr{color:var(--muted);font-size:10px}
 .drillpop .dsub{font-size:11px;color:var(--muted);margin:6px 0 4px}
+
+/* скрываемый левый список + подсветка строки по ссылке + кликабельный номер строки */
+#main.nolist{grid-template-columns:0 1fr 380px}
+#main.nolist #listPane{display:none}
+.sid{cursor:pointer}
+.sid:hover{color:var(--accent)}
+.seg.linked{background:#2b2410;outline:1px solid var(--warn)}
