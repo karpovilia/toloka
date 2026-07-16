@@ -1,5 +1,6 @@
 {
  "event_types": "data/event_types.json",
- "conflicts": "data/conflicts.json",
- "traces_dir": "data/traces"
+ "traces_index": "data/traces_index.json",
+ "traces_dir": "data/traces",
+ "trace_maps_meta": "data/trace_maps_meta.json"
 }
