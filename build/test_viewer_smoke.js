@@ -10,7 +10,7 @@ const DIR = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(DIR, "index.html"), "utf8");
 const appjs = fs.readFileSync(path.join(DIR, "app.js"), "utf8");
 
-const ET = { domains: { M: { types: { backtrack: {}, verify: {}, commit: {}, subgoal_done: {}, branch: {}, failed_attempt: {} } } } };
+const ET = { domains: { M: { types: { backtrack: { definition: "реверс хода рассуждения" }, verify: { definition: "проверка полученного" }, commit: { definition: "финальный ответ" }, subgoal_done: {}, branch: {}, failed_attempt: {} } } } };
 const MM = { hawkes_by_type: { backtrack: { mu: 0.08, alpha: 0.49, beta: 1.5 }, verify: { mu: 0.04, alpha: 0.49, beta: 1.5 }, commit: { mu: 0.005, alpha: 0.86, beta: 0.16 } }, floor: 0.12, lam_max: 3.0, operators: ["DERIVING", "CONCLUDING"] };
 function trace(tf, agents, events) {
   const maxs = Math.max(...events.map(e => e.s)) + 4;
@@ -60,6 +60,10 @@ setTimeout(() => {
   if (gut) gut.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 80, clientY: 80 }));
   const opchip = $("#drillpop .opchip");
   ok(opchip && opchip.textContent === "DERIVING", "клик по карте показал спан: " + (opchip ? opchip.textContent : "нет"));
+  // тултипы: определение события в правой панели + тултип спана на opband
+  ok($("#curEvent .ce-def") && $("#curEvent .ce-def").textContent.includes("реверс"), "определение события в панели: " + ($("#curEvent .ce-def") ? $("#curEvent .ce-def").textContent : "нет"));
+  ok($$("#traceBody .opband").some(b => (b.title || "").includes("DERIVING —")), "тултип спана на карте (что кодирует)");
+  ok(opchip && opchip.title.includes("DERIVING —"), "тултип на чипе спана в попапе: " + (opchip ? opchip.title : ""));
   ok($("#drillpop .dlink"), "в попапе есть кнопка ссылки на строку");
   if ($("#drillpop .dlink")) { $("#drillpop .dlink").dispatchEvent(new window.MouseEvent("click", { bubbles: true })); ok(window.location.hash.includes("seg=3"), "кнопка попапа скопировала ссылку на строку 3: " + window.location.hash); }
   // ссылка на строку: клик по номеру строки -> hash seg= + подсветка linked

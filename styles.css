@@ -212,3 +212,5 @@ mark{border-radius:3px;padding:0 1px}
 .seg.linked{background:#2b2410;outline:1px solid var(--warn)}
 .drillpop .dlink{width:100%;margin:4px 0;padding:5px 8px;border:1px solid var(--line2);background:var(--panel2);color:var(--fg);border-radius:6px;cursor:pointer;font-size:11px;text-align:left}
 .drillpop .dlink:hover{border-color:var(--accent)}
+.ce-def{color:var(--muted);font-size:11px;line-height:1.4}
+.drillpop .dopdesc{color:var(--muted);font-size:10px;line-height:1.35;margin:2px 0 4px}
