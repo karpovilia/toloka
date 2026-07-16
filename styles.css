@@ -74,6 +74,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .maplegend .mlop{color:#0b0d12;border-radius:8px;padding:0 5px;font-size:9px}
 .maplegend .mlsep{color:var(--line2)}
 .btn.small.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
+.seg.cursor{outline:2px solid var(--warn);outline-offset:-1px}
+.maplegend .mlbar{display:inline-block;width:14px;height:6px;background:#e5484d;border-radius:2px;vertical-align:middle}
+/* drill-down попап: распределение λ по типам */
+.drillpop{position:fixed;z-index:30;min-width:210px;max-width:250px;background:var(--panel);
+  border:1px solid var(--line2);border-radius:8px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.55)}
+.drillpop .dh{font-size:11px;color:var(--muted);margin-bottom:6px}
+.drow{display:flex;align-items:center;gap:6px;margin:2px 0}
+.dtype{font-size:11px;min-width:96px}
+.dtype.ours{text-decoration:underline dotted}
+.dbarwrap{flex:1;min-width:0}
+.dbar{display:inline-block;height:8px;border-radius:2px}
+.dval{font-size:10px;color:var(--muted);font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .sid{color:var(--muted);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;user-select:none}
 .stext{flex:1;white-space:pre-wrap;word-break:break-word}
 mark{border-radius:3px;padding:0 1px}

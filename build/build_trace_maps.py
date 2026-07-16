@@ -150,15 +150,48 @@ def fit_hawkes(seqs, sub=200):
     return float(mu), float(alpha), float(beta), -float(res.fun), len(fit_seqs)
 
 
-def lam_series(times, n, mu, alpha, beta):
-    """λ на каждом сегменте 0..n-1 по времени=seg_id (джиттер совпадений)."""
-    t = jitter(times) if len(times) else np.array([])
-    out = []
-    for s in range(n):
-        past = t[t < s]
-        val = mu + alpha * beta * float(np.sum(np.exp(-beta * (s - past)))) if len(past) else mu
-        out.append(round(val, 3))
-    return out
+def fit_by_type(per_trace, sub=200):
+    """Пер-типовый univariate Hawkes: по каждому типу события свой (μ,α,β).
+    Даёт разложение интенсивности по типам (для drill-down)."""
+    from collections import defaultdict
+    pools = defaultdict(list)   # type -> [array времён по трассам]
+    for d in per_trace.values():
+        by_t = defaultdict(list)
+        for e in d["ev"]:
+            by_t[e["t"]].append(float(e["s"]))
+        for t, times in by_t.items():
+            if len(times) >= 2:
+                pools[t].append(np.array(sorted(times)))
+    params = {}
+    for t, seqs in pools.items():
+        if len(seqs) < 3:            # слишком мало трасс с типом — только базовый уровень
+            allt = np.concatenate(seqs) if seqs else np.array([0.0])
+            params[t] = {"mu": max(1e-3, len(allt) / max(1, sum(len(s) for s in seqs) + 1)), "alpha": 0.0, "beta": 0.5, "n_seqs": len(seqs)}
+            continue
+        mu, alpha, beta, ll, nfit = fit_hawkes(seqs, sub=sub)
+        params[t] = {"mu": round(mu, 4), "alpha": round(alpha, 4), "beta": round(beta, 4), "n_seqs": len(seqs)}
+    return params
+
+
+def lam_total(ev, n, params):
+    """Суммарная λ на сегмент = сумма пер-типовых интенсивностей (без джиттера при оценке).
+    λ(s) = Σ_t [μ_t + α_t·β_t·Σ_{события типа t, t_i<s} exp(-β_t(s-t_i))]."""
+    from collections import defaultdict
+    by_t = defaultdict(list)
+    for e in ev:
+        by_t[e["t"]].append(e["s"])
+    floor = sum(p["mu"] for p in params.values())
+    tot = np.full(n, float(floor))
+    for t, times in by_t.items():
+        p = params.get(t)
+        if not p or p["alpha"] <= 0:
+            continue
+        tt = np.array(sorted(times), dtype=float)
+        for s in range(n):
+            past = tt[tt < s]
+            if len(past):
+                tot[s] += p["alpha"] * p["beta"] * float(np.sum(np.exp(-p["beta"] * (s - past))))
+    return [round(float(x), 3) for x in tot]
 
 
 def gather_full():
@@ -207,17 +240,17 @@ def main():
     per_trace = gather_refit() if args.refit else gather_full()
     print(f"{'refit' if args.refit else 'full'}: трасс {len(per_trace)}")
 
-    pool = [[float(e["s"]) for e in sorted(d["ev"], key=lambda x: x["s"])] for d in per_trace.values()]
-    seqs = [np.array(sorted(p)) for p in pool if len(p) >= 2]
-    print(f"фит Хокса на {len(seqs)} трассах, событий в пуле: {sum(len(s) for s in seqs)}")
-    mu, alpha, beta, ll, nfit = fit_hawkes(seqs)
-    print(f"Hawkes: mu={mu:.4f} alpha(branching)={alpha:.4f} beta={beta:.4f} ll={ll:.1f} (фит на {nfit})")
+    params_by_type = fit_by_type(per_trace)
+    floor = round(sum(p["mu"] for p in params_by_type.values()), 4)
+    print("Hawkes по типам:")
+    for t, p in sorted(params_by_type.items(), key=lambda kv: -kv[1]["alpha"]):
+        print(f"  {t:20} mu={p['mu']:.3f} alpha={p['alpha']:.3f} beta={p['beta']:.3f} (трасс {p['n_seqs']})")
+    print(f"floor (Σμ_t) = {floor}")
 
     lam_max = 0.0; ops_seen = set(); wrote = 0
     for d in per_trace.values():
-        times = [e["s"] for e in d["ev"]]
-        lam = lam_series(times, d["n"], mu, alpha, beta)
-        lam_max = max(lam_max, max(lam) if lam else mu)
+        lam = lam_total(d["ev"], d["n"], params_by_type)
+        lam_max = max(lam_max, max(lam) if lam else floor)
         for s in d["sp"]:
             ops_seen.add(s["op"])
         tpath = os.path.join(TR, d["trace_file"])
@@ -232,11 +265,11 @@ def main():
         json.dump(obj, open(tpath, "w"), ensure_ascii=False)
         wrote += 1
 
-    meta = {"hawkes": {"mu": mu, "alpha": alpha, "beta": beta, "loglik": ll,
-                       "axis": "seg_id", "kernel": "alpha*beta*exp(-beta*dt)"},
+    meta = {"hawkes_by_type": params_by_type, "floor": floor,
+            "axis": "seg_id", "kernel": "alpha*beta*exp(-beta*dt)",
             "lam_max": round(lam_max, 3), "operators": sorted(ops_seen),
             "n_traces": wrote,
-            "note": "λ измерена: univariate Hawkes MLE на пуле union-событий всех агентов; развилки = типы branch/backtrack/failed_attempt"}
+            "note": "пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях всех агентов; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt"}
     json.dump(meta, open(os.path.join(DATA, "trace_maps_meta.json"), "w"), ensure_ascii=False, indent=1)
     print(f"обновлено trace-файлов: {wrote} | lam_max={lam_max:.2f} | операторы: {sorted(ops_seen)}")
 

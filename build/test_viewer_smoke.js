@@ -14,7 +14,7 @@ const ITEMS = JSON.parse(fs.readFileSync(path.join(__dirname, "_smoke_items.json
 const CFG = { event_types: "ET", conflicts: "CF" };
 
 const CFG2 = { event_types: "ET", conflicts: "CF", traces_dir: "data/traces", trace_maps_meta: "MM" };
-const MM = { hawkes: { mu: 0.3, alpha: 0.5, beta: 0.3 }, lam_max: 4.0, operators: ["SETUP", "DERIVING", "EXPLORING", "CONCLUDING"] };
+const MM = { hawkes_by_type: { branch: { mu: 0.02, alpha: 0.49, beta: 1.5 }, verify: { mu: 0.04, alpha: 0.49, beta: 1.5 }, backtrack: { mu: 0.08, alpha: 0.49, beta: 1.5 } }, floor: 0.14, lam_max: 4.0, operators: ["SETUP", "DERIVING", "EXPLORING", "CONCLUDING"] };
 function makeTrace(it) {
   const hi = it.seg_id + 6;
   const segments = []; for (let i = 0; i <= hi; i++) segments.push({ seg_id: i, text: "seg " + i + " text body" });
@@ -118,8 +118,23 @@ setTimeout(() => {
     $("#wholeBtn").click();
     setTimeout(() => {
       ok($$("#traceBody .seg").length === full, "вся трасса: " + $$("#traceBody .seg").length + " из " + full + " сегментов");
-      console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
-      process.exit(fail ? 1 : 0);
+      // 9) drill-down: клик по гуттеру сегмента с событиями -> попап распределения λ
+      const grow = $('#traceBody .seg[data-seg-id="' + it.seg_id + '"] .gutter');
+      if (grow) grow.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 100, clientY: 100 }));
+      ok($("#drillpop") && $$("#drillpop .drow").length > 0, "drill-down попап: " + ($("#drillpop") ? $$("#drillpop .drow").length + " типов" : "нет"));
+      // 10) навигация по событию: next event -> курсор на сегменте события
+      $("#nextEv").click();
+      ok($$("#traceBody .seg.cursor").length >= 1, "переход к событию: курсор на " + $$("#traceBody .seg.cursor").length + " сегм.");
+      // 11) deep-link: hashchange -> навигация к ITEMS[0]
+      window.location.hash = "#item=" + encodeURIComponent(ITEMS[0].item_id);
+      window.dispatchEvent(new window.Event("hashchange"));
+      setTimeout(() => {
+        const names = $$("#agents .aname").map(e => e.textContent);
+        ok(names.length === 3 && names.includes("Claude"), "deep-link перешёл к ITEMS[0]: " + names.join(","));
+        ok(window.location.hash.includes("item="), "URL-хэш обновлён: " + window.location.hash);
+        console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
+        process.exit(fail ? 1 : 0);
+      }, 40);
     }, 60);
   }, 200);
 }, 500);

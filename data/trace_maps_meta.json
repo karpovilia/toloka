@@ -1,13 +1,46 @@
 {
- "hawkes": {
-  "mu": 0.13843167190047345,
-  "alpha": 0.415979735744501,
-  "beta": 0.5755133852550014,
-  "loglik": -54632.77522205232,
-  "axis": "seg_id",
-  "kernel": "alpha*beta*exp(-beta*dt)"
+ "hawkes_by_type": {
+  "backtrack": {
+   "mu": 0.0835,
+   "alpha": 0.4893,
+   "beta": 1.5254,
+   "n_seqs": 506
+  },
+  "subgoal_done": {
+   "mu": 0.0315,
+   "alpha": 0.4887,
+   "beta": 1.5217,
+   "n_seqs": 536
+  },
+  "branch": {
+   "mu": 0.0204,
+   "alpha": 0.4885,
+   "beta": 1.5211,
+   "n_seqs": 423
+  },
+  "commit": {
+   "mu": 0.0055,
+   "alpha": 0.8569,
+   "beta": 0.1637,
+   "n_seqs": 509
+  },
+  "failed_attempt": {
+   "mu": 0.0155,
+   "alpha": 0.2261,
+   "beta": 0.2304,
+   "n_seqs": 367
+  },
+  "verify": {
+   "mu": 0.044,
+   "alpha": 0.4889,
+   "beta": 1.5254,
+   "n_seqs": 525
+  }
  },
- "lam_max": 1.359,
+ "floor": 0.2004,
+ "axis": "seg_id",
+ "kernel": "alpha*beta*exp(-beta*dt)",
+ "lam_max": 1.162,
  "operators": [
   "CONCLUDING",
   "DERIVING",
@@ -17,5 +50,5 @@
   "VERIFYING"
  ],
  "n_traces": 584,
- "note": "λ измерена: univariate Hawkes MLE на пуле union-событий всех агентов; развилки = типы branch/backtrack/failed_attempt"
+ "note": "пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях всех агентов; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt"
 }
