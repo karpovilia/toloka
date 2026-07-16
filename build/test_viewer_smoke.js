@@ -1,140 +1,94 @@
 "use strict";
-/* jsdom-смоук для нового app.js (Toloka N-way conflict viewer).
-   Грузит index.html + app.js в jsdom, стабит fetch (config, event_types, 2 реальных сайта),
-   проверяет: данные подтянулись; список и карточки агентов отрисованы; вердикт проставляется
-   и переключает match/miss на карточках; клавиши (j, 0, цифры) работают; экспорт формирует JSON. */
+/* jsdom-смоук для Toloka v2 (верификация событий на трассе).
+   Стабит fetch (config, event_types, traces_index, trace_maps_meta, trace-файлы),
+   проверяет: список трасс; авто-открытие; кандидаты+инлайн-чипы; ✓/✗ пишут вердикт;
+   навигация j/k; retype; прогресс; deep-link на трассу; экспорт; GitHub PUT. */
 const fs = require("fs"), path = require("path");
 const { JSDOM } = require(path.join("/home/ki/repos/reasoning/internal_signals_poc/trace_verifier/node_modules/jsdom"));
 
 const DIR = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(DIR, "index.html"), "utf8");
 const appjs = fs.readFileSync(path.join(DIR, "app.js"), "utf8");
-const ET = JSON.parse(fs.readFileSync(path.join(DIR, "data/event_types.json"), "utf8"));
-const ITEMS = JSON.parse(fs.readFileSync(path.join(__dirname, "_smoke_items.json"), "utf8"));
-const CFG = { event_types: "ET", conflicts: "CF" };
 
-const CFG2 = { event_types: "ET", conflicts: "CF", traces_dir: "data/traces", trace_maps_meta: "MM" };
-const MM = { hawkes_by_type: { branch: { mu: 0.02, alpha: 0.49, beta: 1.5 }, verify: { mu: 0.04, alpha: 0.49, beta: 1.5 }, backtrack: { mu: 0.08, alpha: 0.49, beta: 1.5 } }, floor: 0.14, lam_max: 4.0, operators: ["SETUP", "DERIVING", "EXPLORING", "CONCLUDING"] };
-function makeTrace(it) {
-  const hi = it.seg_id + 6;
-  const segments = []; for (let i = 0; i <= hi; i++) segments.push({ seg_id: i, text: "seg " + i + " text body" });
-  const events = [{ s: it.seg_id, t: "branch", a: "claude" }, { s: it.seg_id, t: "verify", a: "regex" }];
-  const spans = [{ a: 0, b: Math.max(1, it.seg_id), op: "DERIVING" }, { a: Math.max(1, it.seg_id), b: hi + 1, op: "EXPLORING" }];
-  const lam = segments.map((s, i) => +(0.3 + (i === it.seg_id ? 3.5 : 0.5)).toFixed(3));
-  return { cell: it.cell, question_id: it.question_id, segments, events, spans, lam, agents: it.agents_present };
+const ET = { domains: { M: { types: { backtrack: {}, verify: {}, commit: {}, subgoal_done: {}, branch: {}, failed_attempt: {} } } } };
+const MM = { hawkes_by_type: { backtrack: { mu: 0.08, alpha: 0.49, beta: 1.5 }, verify: { mu: 0.04, alpha: 0.49, beta: 1.5 }, commit: { mu: 0.005, alpha: 0.86, beta: 0.16 } }, floor: 0.12, lam_max: 3.0, operators: ["DERIVING", "CONCLUDING"] };
+function trace(tf, agents, events) {
+  const maxs = Math.max(...events.map(e => e.s)) + 4;
+  const segments = []; for (let i = 0; i <= maxs; i++) segments.push({ seg_id: i, text: "seg " + i });
+  const spans = [{ a: 0, b: Math.ceil(maxs / 2), op: "DERIVING" }, { a: Math.ceil(maxs / 2), b: maxs + 1, op: "CONCLUDING" }];
+  const lam = segments.map(() => 0.3);
+  return { cell: tf.replace(".json", ""), question_id: tf, benchmark: "gpqa_diamond", domain: "M", segments, events, spans, lam, agents };
 }
-const TRACES = { [ITEMS[0].trace_file]: makeTrace(ITEMS[0]), [ITEMS[1].trace_file]: makeTrace(ITEMS[1]) };
-const routes = { "config.json": CFG2, "ET": ET, "CF": ITEMS, "MM": MM, ...Object.fromEntries(Object.entries(TRACES).map(([k, v]) => [k, v])) };
-let fail = 0;
-function ok(c, m) { console.log((c ? "  ok  " : " FAIL ") + m); if (!c) fail++; }
+const T1 = trace("t1.json", ["regex", "claude", "deepseek"], [
+  { s: 3, t: "backtrack", a: "claude" }, { s: 3, t: "backtrack", a: "deepseek" },
+  { s: 8, t: "verify", a: "regex" }, { s: 12, t: "commit", a: "claude" }]);   // 3 кандидата
+const T2 = trace("t2.json", ["regex", "qwen"], [
+  { s: 2, t: "backtrack", a: "qwen" }, { s: 2, t: "backtrack", a: "regex" }]);   // 1 кандидат
+const INDEX = [
+  { trace_file: "t1.json", cell: "gemma__gpqa_diamond", question_id: "q1", benchmark: "gpqa_diamond", domain: "M", model: "gemma", slice: "A", n_segments: T1.segments.length, n_events: 4, n_candidates: 3, agents: T1.agents },
+  { trace_file: "t2.json", cell: "gptoss__gpqa_diamond", question_id: "q2", benchmark: "gpqa_diamond", domain: "M", model: "gptoss", slice: "B", n_segments: T2.segments.length, n_events: 2, n_candidates: 1, agents: T2.agents },
+];
+const CFG = { event_types: "ET", traces_index: "IX", traces_dir: "data/traces", trace_maps_meta: "MM" };
+const routes = { "config.json": CFG, "ET": ET, "IX": INDEX, "MM": MM, "t1.json": T1, "t2.json": T2 };
 
+let fail = 0; const ok = (c, m) => { console.log((c ? "  ok  " : " FAIL ") + m); if (!c) fail++; };
 const dom = new JSDOM(html, { runScripts: "outside-only", pretendToBeVisual: true, url: "http://localhost/" });
-const { window } = dom;
-global.window = window; global.document = window.document;
+const { window } = dom; global.window = window; global.document = window.document;
 let ghPut = null;
 window.fetch = (u, opts) => {
-  if (String(u).includes("api.github.com")) {
-    if (opts && opts.method === "PUT") { ghPut = JSON.parse(opts.body); return Promise.resolve({ ok: true, json: () => Promise.resolve({ commit: { sha: "abcdef123" } }) }); }
-    return Promise.resolve({ ok: false, status: 404 }); // нет файла -> sha null
-  }
+  if (String(u).includes("api.github.com")) { if (opts && opts.method === "PUT") { ghPut = JSON.parse(opts.body); return Promise.resolve({ ok: true, json: () => Promise.resolve({ commit: { sha: "abc1234" } }) }); } return Promise.resolve({ ok: false, status: 404 }); }
   const key = Object.keys(routes).find(k => u === k || u.endsWith(k));
-  return Promise.resolve({ ok: key != null, status: key != null ? 200 : 404, text: () => Promise.resolve(JSON.stringify(routes[key])) });
+  return Promise.resolve({ ok: key != null, status: key ? 200 : 404, text: () => Promise.resolve(JSON.stringify(routes[key])) });
 };
-window.btoa = (s) => Buffer.from(s, "binary").toString("base64");
-window.atob = (s) => Buffer.from(s, "base64").toString("binary");
-// jsdom даёт рабочий localStorage (url задан); только читаем его в проверках
+window.btoa = s => Buffer.from(s, "binary").toString("base64");
 const store = window.localStorage;
 try { window.URL.createObjectURL = () => "blob:x"; window.URL.revokeObjectURL = () => {}; } catch {}
-let lastExport = null;
-const realCreate = window.document.createElement.bind(window.document);
-window.HTMLAnchorElement.prototype.click = function () { lastExport = this.download; };
-
+let lastExport = null; window.HTMLAnchorElement.prototype.click = function () { lastExport = this.download; };
 window.eval(appjs);
-
-function key(k) { const ev = new window.KeyboardEvent("keydown", { key: k, bubbles: true }); window.document.dispatchEvent(ev); }
-const $ = s => window.document.querySelector(s);
-const $$ = s => [...window.document.querySelectorAll(s)];
+const $ = s => window.document.querySelector(s), $$ = s => [...window.document.querySelectorAll(s)];
+const key = k => window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }));
 
 setTimeout(() => {
-  // 1) данные подтянулись
-  ok($("#filterCount").textContent.includes("из 2"), "загружено 2 конфликта: " + $("#filterCount").textContent);
-  ok($$("#exampleList li").length >= 2, "список: " + $$("#exampleList li").length + " элементов");
-
-  // 2) карточки агентов первого сайта (regex+claude+deepseek)
-  const names = $$("#agents .aname").map(e => e.textContent);
-  ok(names.length === 3 && names.includes("Claude") && names.includes("DeepSeek"), "3 карточки агентов: " + names.join(","));
-  ok($$("#agents .atype").length >= 3, "типы на карточках отрисованы: " + $$("#agents .atype").length);
-  // провенанс: backtrack -> ReasonOps (.ro), failed_attempt -> наш (.ours)
-  const roTxt = $$("#agents .atype.ro").map(e => e.textContent);
-  const oursTxt = $$("#agents .atype.ours").map(e => e.textContent);
-  ok(roTxt.includes("backtrack"), "ReasonOps-рамка на backtrack: " + roTxt.join(","));
-  ok(oursTxt.includes("failed_attempt"), "наша рамка на failed_attempt: " + oursTxt.join(","));
-
-  // 3) МУЛЬТИСЕЛЕКТ: жмём 1 и 2 -> два типа в вердикте (массив)
-  const cands = $$("#verdict .vbtn.cand").map(b => b.textContent);
-  ok(cands.length >= 2, "кандидат-кнопок ≥2: " + cands.join(" | "));
-  key("1"); key("2");
-  const firstId = ITEMS[0].item_id;
-  let rec = JSON.parse(store.getItem("tv_annot::ki") || "{}");
-  ok(Array.isArray(rec[firstId].verdict) && rec[firstId].verdict.length === 2,
-     "мультиселект: 2 типа в вердикте: " + JSON.stringify(rec[firstId].verdict));
-  // повторное нажатие 2 -> снимает
-  key("2");
-  rec = JSON.parse(store.getItem("tv_annot::ki") || "{}");
-  ok(rec[firstId].verdict.length === 1, "повторное нажатие снимает тип: " + JSON.stringify(rec[firstId].verdict));
-  ok($$("#agents .agent.match").length + $$("#agents .agent.miss").length === 3, "карточки размечены match/miss: " +
-     $$("#agents .agent.match").length + " match / " + $$("#agents .agent.miss").length + " miss");
-  ok($("#progress").textContent.includes("1 /"), "прогресс обновился: " + $("#progress").textContent);
-
-  // 4) навигация к сайту 2 (qwen) и вердикт '∅' (исключающий)
+  // 1) список трасс + авто-открытие первой
+  ok($$("#traceList li").length === 2, "список трасс: " + $$("#traceList li").length);
+  ok($("#qLabel").textContent.includes("q1"), "открыта первая трасса: " + $("#qLabel").textContent.slice(0, 40));
+  // 2) кандидаты + инлайн-чипы (3)
+  ok($$("#traceBody .ev").length === 3, "инлайн-события: " + $$("#traceBody .ev").length);
+  ok($("#curEvent .ce-pos").textContent.includes("1 / 3"), "текущее событие 1/3: " + $("#curEvent .ce-pos").textContent);
+  // 3) подтверждаем первое (клавиша 1) -> вердикт ✓ записан, прогресс
+  key("1");
+  const a1 = JSON.parse(store.getItem("tv_annot::ki") || "{}");
+  ok(a1["t1.json|s3|backtrack"] && a1["t1.json|s3|backtrack"].verdict === "✓", "✓ записан: " + JSON.stringify(a1["t1.json|s3|backtrack"]));
+  ok($("#traceProgress").textContent.includes("1 / 3"), "прогресс трассы 1/3: " + $("#traceProgress").textContent);
+  ok($$("#traceBody .ev.done").length === 1, "чип помечен done: " + $$("#traceBody .ev.done").length);
+  // 4) навигация j -> событие 2, отклоняем (клавиша 2)
   key("j");
-  const names2 = $$("#agents .aname").map(e => e.textContent);
-  ok(names2.length === 2 && names2.includes("Qwen"), "второй сайт: агенты " + names2.join(","));
-  key("1"); key("0");   // сначала тип, потом ∅ должен вытеснить тип
-  const rec2 = JSON.parse(store.getItem("tv_annot::ki") || "{}");
-  ok(JSON.stringify(rec2[ITEMS[1].item_id].verdict) === '["∅"]', "∅ вытеснил тип (исключающий): " + JSON.stringify(rec2[ITEMS[1].item_id].verdict));
-
-  // 5) экспорт файлом
+  ok($("#curEvent .ce-pos").textContent.includes("2 / 3"), "перешли к 2/3: " + $("#curEvent .ce-pos").textContent);
+  key("2");
+  const a2 = JSON.parse(store.getItem("tv_annot::ki") || "{}");
+  ok(a2["t1.json|s8|verify"] && a2["t1.json|s8|verify"].verdict === "✗", "✗ записан для verify@8");
+  // 5) retype третьего через правую панель
+  key("j");
+  const sel = $("#curEvent .ce-retype"); sel.value = "subgoal_done"; sel.dispatchEvent(new window.Event("change"));
+  const a3 = JSON.parse(store.getItem("tv_annot::ki") || "{}");
+  ok(a3["t1.json|s12|commit"] && a3["t1.json|s12|commit"].verdict === "subgoal_done", "retype commit->subgoal_done: " + JSON.stringify(a3["t1.json|s12|commit"]));
+  // 6) экспорт
   $("#exportAnnot").click();
-  ok(lastExport === "annot_ki.json", "экспорт вызвал скачивание: " + lastExport);
-
-  // 6) GitHub-коммит: заполняем токен и жмём -> ушёл PUT с base64-контентом
-  $("#ghOwner").value = "karpovilia"; $("#ghRepo").value = "toloka"; $("#ghToken").value = "github_pat_x";
-  $("#ghCommit").click();
+  ok(lastExport === "annot_ki.json", "экспорт: " + lastExport);
+  // 7) deep-link на t2
+  window.location.hash = "#trace=t2.json";
+  window.dispatchEvent(new window.Event("hashchange"));
   setTimeout(() => {
-    ok(ghPut && ghPut.content, "GitHub PUT ушёл с контентом");
-    if (ghPut) {
-      const decoded = JSON.parse(Buffer.from(ghPut.content, "base64").toString("utf8"));
-      ok(decoded.annotator_id === "ki" && decoded.annotations, "PUT-контент = валидный annot JSON (annotator " + decoded.annotator_id + ")");
-      ok(ghPut.branch === "main", "PUT в ветку main");
-    }
-    // 7) карта reasoning: гуттер, спан-полоса, λ-бар, глиф развилки (трасса загружена)
-    ok($$("#traceBody .gutter").length > 0, "гуттер-карта отрисован: " + $$("#traceBody .gutter").length + " строк");
-    ok($$("#traceBody .opband").some(b => b.style.background && b.style.background !== "transparent"), "спан-полоса окрашена");
-    ok($$("#traceBody .lam").some(b => b.style.width), "λ-бар имеет ширину");
-    ok($$("#traceBody .glyph").some(g => g.textContent === "◇"), "глиф развилки ◇ (branch) на карте");
-    // 8) режим «вся трасса»: рендерятся все сегменты
-    const it = ITEMS[1]; const full = TRACES[it.trace_file].segments.length;
-    $("#wholeBtn").click();
+    ok($("#qLabel").textContent.includes("q2"), "deep-link открыл t2: " + $("#qLabel").textContent.slice(0, 40));
+    ok($$("#traceBody .ev").length === 1, "t2: 1 кандидат (regex+qwen merged): " + $$("#traceBody .ev").length);
+    // 8) GitHub PUT
+    $("#ghOwner").value = "karpovilia"; $("#ghRepo").value = "toloka"; $("#ghToken").value = "github_pat_x";
+    $("#ghCommit").click();
     setTimeout(() => {
-      ok($$("#traceBody .seg").length === full, "вся трасса: " + $$("#traceBody .seg").length + " из " + full + " сегментов");
-      // 9) drill-down: клик по гуттеру сегмента с событиями -> попап распределения λ
-      const grow = $('#traceBody .seg[data-seg-id="' + it.seg_id + '"] .gutter');
-      if (grow) grow.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 100, clientY: 100 }));
-      ok($("#drillpop") && $$("#drillpop .drow").length > 0, "drill-down попап: " + ($("#drillpop") ? $$("#drillpop .drow").length + " типов" : "нет"));
-      // 10) навигация по событию: next event -> курсор на сегменте события
-      $("#nextEv").click();
-      ok($$("#traceBody .seg.cursor").length >= 1, "переход к событию: курсор на " + $$("#traceBody .seg.cursor").length + " сегм.");
-      // 11) deep-link: hashchange -> навигация к ITEMS[0]
-      window.location.hash = "#item=" + encodeURIComponent(ITEMS[0].item_id);
-      window.dispatchEvent(new window.Event("hashchange"));
-      setTimeout(() => {
-        const names = $$("#agents .aname").map(e => e.textContent);
-        ok(names.length === 3 && names.includes("Claude"), "deep-link перешёл к ITEMS[0]: " + names.join(","));
-        ok(window.location.hash.includes("item="), "URL-хэш обновлён: " + window.location.hash);
-        console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
-        process.exit(fail ? 1 : 0);
-      }, 40);
-    }, 60);
-  }, 200);
-}, 500);
+      ok(ghPut && ghPut.content, "GitHub PUT ушёл");
+      if (ghPut) { const dec = JSON.parse(Buffer.from(ghPut.content, "base64").toString("utf8")); ok(dec.tool === "toloka-v2" && dec.annotations, "PUT-контент = annot v2"); }
+      console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
+      process.exit(fail ? 1 : 0);
+    }, 120);
+  }, 80);
+}, 400);

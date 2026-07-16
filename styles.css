@@ -144,3 +144,55 @@ mark{border-radius:3px;padding:0 1px}
 #toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:#000;color:#fff;
   border:1px solid var(--line2);border-radius:8px;padding:8px 14px;z-index:20;max-width:80vw;
   word-break:break-word}
+
+/* ===================== v2: верификация событий ===================== */
+#traceList{list-style:none;margin:0;padding:0;overflow-y:auto;flex:1}
+#traceList li{padding:7px 10px;border-bottom:1px solid var(--line);cursor:pointer}
+#traceList li:hover{background:var(--panel)}
+#traceList li.active{background:#16233c;border-left:3px solid var(--accent);padding-left:7px}
+#traceList li.muted{color:var(--muted);cursor:default;text-align:center}
+#traceList .qid{color:var(--muted);font-size:11px;margin-right:auto}
+.li-meta{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:3px}
+.badge.prog{font-variant-numeric:tabular-nums}
+.badge.prog.part{border-color:var(--warn);color:var(--warn)}
+.badge.prog.full{background:var(--good);border-color:var(--good);color:#fff}
+.adot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+
+.ctxbar{flex-wrap:wrap}
+.ctxhint{color:var(--muted)}
+
+/* строка сегмента: гуттер | № | текст+события */
+.segright{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.seg.cursorseg{background:#1b2a12;outline:1px solid var(--warn)}
+.evbox{display:flex;flex-direction:column;gap:4px;margin:2px 0 4px}
+.ev{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--line);
+  border-radius:8px;padding:4px 8px;cursor:pointer}
+.ev.cur{outline:2px solid var(--warn);outline-offset:-1px}
+.ev.done{border-color:var(--good)}
+.evtype{font-size:11px;padding:1px 8px;border-radius:10px;white-space:nowrap}
+.evtype.ours{border-radius:2px;outline:1.5px dashed currentColor;outline-offset:1px}
+.evag{display:flex;gap:2px}
+.evacts{margin-left:auto;display:flex;align-items:center;gap:4px}
+.vb{width:24px;height:22px;border-radius:6px;border:1px solid var(--line2);background:var(--panel2);cursor:pointer;font-size:12px;padding:0}
+.vb.ok.on{background:var(--good);border-color:var(--good);color:#fff}
+.vb.no.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.retype{background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:2px 4px;font-size:11px;max-width:96px}
+
+/* правая панель: текущее событие */
+.rphead{padding:8px 10px;border-bottom:1px solid var(--line);color:var(--muted);font-size:12px;display:flex;justify-content:space-between;gap:8px}
+.rpkeys{color:var(--faint,#6c6b67);font-size:10px}
+#curEvent{padding:10px;display:flex;flex-direction:column;gap:8px}
+.ce-pos{color:var(--muted);font-size:12px}
+.ce-type{align-self:flex-start;font-size:13px;padding:2px 10px;border-radius:12px}
+.ce-type.ours{border-radius:3px;outline:1.5px dashed currentColor;outline-offset:2px}
+.ce-ag{color:var(--muted);font-size:12px}
+.ce-acts{display:flex;gap:8px}
+.vbig{flex:1;padding:8px;border-radius:8px;border:1px solid var(--line2);background:var(--panel2);cursor:pointer;font-size:13px}
+.vbig.ok.on{background:var(--good);border-color:var(--good);color:#fff}
+.vbig.no.on{background:var(--bad);border-color:var(--bad);color:#fff}
+.ce-retype{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:6px}
+.ce-ver{color:var(--good);font-size:12px}
+.ce-note{width:100%;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:6px;resize:vertical}
+.tprog{padding:8px 10px;color:var(--muted);font-size:12px;border-top:1px solid var(--line)}
+#peers{padding:0 10px 10px;display:flex;flex-direction:column;gap:4px}
+.peer{background:var(--panel2);border:1px solid var(--line2);border-left:3px solid var(--purple);border-radius:6px;padding:5px 8px;font-size:12px}

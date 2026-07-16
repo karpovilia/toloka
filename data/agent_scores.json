@@ -1,16 +1,10 @@
 {
- "adjudicated_sites": 0,
- "sites_total_in_viewer": 6000,
+ "adjudicated_candidates": 0,
+ "total_candidates": 36698,
  "agent_scores": {},
  "inter_annotator": {
   "n_annotators": 0,
   "annotators": []
  },
- "dawid_skene_reliability": {
-  "claude": 0.3349479693383296,
-  "deepseek": 0.3677095329391025,
-  "qwen": 0.03574089766032289,
-  "regex": 0.6189294523498658
- },
- "note": "метрики условны НА конфликтах (сайты не случайны); accuracy = доля совпадений с мажоритарным человеком"
+ "note": "detection precision = доля подтверждённых среди размеченных кандидатов агента; type accuracy = верный тип среди реальных; recall не измеряется (пропуски не размечаются)"
 }

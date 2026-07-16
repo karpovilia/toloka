@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Toloka — адъюдикация конфликтов разметки (regex / Claude / DeepSeek / Qwen)</title>
+<title>Toloka — верификация событий на reasoning-трассах (regex / Claude / DeepSeek / Qwen)</title>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
 <header id="topbar">
-  <div class="brand">Toloka<span class="sub">conflict adjudication</span></div>
+  <div class="brand">Toloka<span class="sub">event verification</span></div>
 
   <div class="loaders">
     <label>аннотатор:
@@ -17,9 +17,9 @@
     <span class="sep">|</span>
     <label class="btn file">импорт разметки
       <input type="file" id="importAnnot" accept=".json" multiple hidden></label>
-    <button class="btn" id="exportAnnot" title="выгрузить свою разметку одним файлом">экспорт разметки</button>
+    <button class="btn" id="exportAnnot" title="выгрузить свою разметку одним файлом">экспорт</button>
     <button class="btn" id="ghBtn" title="сохранить разметку коммитом в GitHub">💾 GitHub</button>
-    <button class="btn" id="shareBtn" title="скопировать ссылку на этот сайт/трассу">🔗 ссылка</button>
+    <button class="btn" id="shareBtn" title="скопировать ссылку на эту трассу">🔗 ссылка</button>
     <span id="progress" class="progress"></span>
   </div>
 
@@ -33,84 +33,58 @@
       <button class="btn" id="ghSaveCfg">сохранить настройки</button>
       <button class="btn primary" id="ghCommit">коммитить разметку</button>
     </div>
-    <div class="ghnote">Токен хранится только в этом браузере (localStorage) и уходит напрямую в api.github.com. Для приватного репо нужен PAT с доступом к нему. Файл: <code>&lt;path&gt;/annot_&lt;ник&gt;.json</code>.</div>
+    <div class="ghnote">Токен хранится только в этом браузере (localStorage) и уходит напрямую в api.github.com. Для приватного репо нужен PAT с доступом к нему.</div>
   </div>
-
-  <nav class="nav">
-    <button class="btn" id="prevBtn" title="k / ←">◀</button>
-    <span id="posLabel" class="pos">–/–</span>
-    <button class="btn" id="nextBtn" title="j / →">▶</button>
-  </nav>
 </header>
 
 <div id="main">
   <aside id="listPane">
     <div class="filters">
-      <input type="search" id="textSearch" placeholder="поиск: цитата / тип / заметка…">
+      <input type="search" id="textSearch" placeholder="поиск: qid / model">
       <div class="frow">
+        <select id="fBench"><option value="">все бенчи</option></select>
         <select id="fSlice">
           <option value="">все срезы</option>
           <option value="A">A · regex+Claude+DeepSeek</option>
           <option value="B">B · regex+Qwen</option>
         </select>
-        <select id="fBench"><option value="">все бенчи</option></select>
       </div>
       <div class="frow">
-        <select id="fPrio">
-          <option value="">любой приоритет</option>
-          <option value="4">4 · type_mismatch LLM</option>
-          <option value="3">3 · presence-split LLM</option>
-          <option value="2">2 · LLM vs regex</option>
-          <option value="1">1 · одиночное / regex-only</option>
-        </select>
-        <select id="fType"><option value="">любой тип события</option></select>
-      </div>
-      <div class="frow">
+        <select id="fAgent"><option value="">любой агент</option></select>
         <select id="fMine">
-          <option value="">моя разметка: любая</option>
-          <option value="unann">не размечено мной</option>
-          <option value="ann">размечено мной</option>
+          <option value="">все трассы</option>
+          <option value="unfinished">не дозавершённые</option>
+          <option value="untouched">не начатые</option>
+          <option value="done">завершённые</option>
         </select>
-        <select id="fAgent"><option value="">любой агент участвует</option></select>
       </div>
       <div class="fcount" id="filterCount"></div>
     </div>
-    <ul id="exampleList"></ul>
+    <ul id="traceList"></ul>
   </aside>
 
   <section id="center">
     <div id="qLabel" class="qlabel"></div>
     <div class="ctxbar">
-      <span>окно ±</span>
-      <input type="number" id="ctxRadius" value="12" min="0" max="60" step="1">
-      <span>сегм.</span>
-      <button class="btn small" id="wholeBtn" title="показать трассу целиком">вся трасса</button>
-      <button class="btn small" id="prevEv" title="предыдущее событие (p)">◀ событие</button>
-      <button class="btn small" id="nextEv" title="следующее событие (n)">событие ▶</button>
-      <button class="btn small" id="toFocus" title="к спорному сегменту">↻ фокус</button>
+      <button class="btn small" id="prevEv" title="предыдущее событие (p / k)">◀ событие</button>
+      <button class="btn small" id="nextEv" title="следующее событие (n / j)">событие ▶</button>
+      <span class="ctxhint">окно ±</span>
+      <input type="number" id="ctxRadius" value="12" min="0" max="80" step="1">
+      <button class="btn small" id="wholeBtn" title="вся трасса целиком">вся трасса</button>
       <div class="maplegend" id="mapLegend">
         <span class="mlt">спаны:</span>
         <span class="mlop" style="background:#6e56cf">SETUP</span><span class="mlop" style="background:#4c8dff">DERIVING</span><span class="mlop" style="background:#f76b15">EXPLORING</span><span class="mlop" style="background:#12a594">VERIFYING</span><span class="mlop" style="background:#e5484d">REVISING</span><span class="mlop" style="background:#46a758">CONCLUDING</span><span class="mlop" style="background:#8e4ec6">GROUNDING</span>
-        <span class="mlsep">·</span><span class="mlt"><span class="mlbar"></span> красная полоса = λ Hawkes (интенсивность)</span>
-        <span class="mlsep">·</span><span class="mlt">события: ◇ branch · ◄ backtrack · ✗ failed · • прочие</span>
-        <span class="mlsep">·</span><span class="mlt">клик по карте — распределение λ по типам</span>
+        <span class="mlsep">·</span><span class="mlt"><span class="mlbar"></span> λ Hawkes · ◇branch ◄backtrack ✗failed •прочее · клик — распределение λ</span>
       </div>
     </div>
     <div id="traceBody"></div>
   </section>
 
   <aside id="rightPane">
-    <div class="focusbox">
-      <div class="focushead">сайт: <span id="focusSeg">–</span></div>
-      <div id="focusText" class="focustext"></div>
-    </div>
-    <div class="typelegend">
-      <span class="atype ro" title="тип есть в таксономии ReasonOps">ReasonOps</span>
-      <span class="atype ours" title="наш тип события">наш тип</span>
-    </div>
-    <div id="agents"></div>
-    <div id="verdict"></div>
-    <div id="myDecisions"></div>
+    <div class="rphead">текущее событие <span class="rpkeys">j/k · 1 ✓ · 2 ✗</span></div>
+    <div id="curEvent"></div>
+    <div id="traceProgress" class="tprog"></div>
+    <div id="peers"></div>
   </aside>
 </div>
 
