@@ -13,7 +13,18 @@ const ET = JSON.parse(fs.readFileSync(path.join(DIR, "data/event_types.json"), "
 const ITEMS = JSON.parse(fs.readFileSync(path.join(__dirname, "_smoke_items.json"), "utf8"));
 const CFG = { event_types: "ET", conflicts: "CF" };
 
-const routes = { "config.json": CFG, "ET": ET, "CF": ITEMS };
+const CFG2 = { event_types: "ET", conflicts: "CF", traces_dir: "data/traces", trace_maps_meta: "MM" };
+const MM = { hawkes: { mu: 0.3, alpha: 0.5, beta: 0.3 }, lam_max: 4.0, operators: ["SETUP", "DERIVING", "EXPLORING", "CONCLUDING"] };
+function makeTrace(it) {
+  const hi = it.seg_id + 6;
+  const segments = []; for (let i = 0; i <= hi; i++) segments.push({ seg_id: i, text: "seg " + i + " text body" });
+  const events = [{ s: it.seg_id, t: "branch", a: "claude" }, { s: it.seg_id, t: "verify", a: "regex" }];
+  const spans = [{ a: 0, b: Math.max(1, it.seg_id), op: "DERIVING" }, { a: Math.max(1, it.seg_id), b: hi + 1, op: "EXPLORING" }];
+  const lam = segments.map((s, i) => +(0.3 + (i === it.seg_id ? 3.5 : 0.5)).toFixed(3));
+  return { cell: it.cell, question_id: it.question_id, segments, events, spans, lam, agents: it.agents_present };
+}
+const TRACES = { [ITEMS[0].trace_file]: makeTrace(ITEMS[0]), [ITEMS[1].trace_file]: makeTrace(ITEMS[1]) };
+const routes = { "config.json": CFG2, "ET": ET, "CF": ITEMS, "MM": MM, ...Object.fromEntries(Object.entries(TRACES).map(([k, v]) => [k, v])) };
 let fail = 0;
 function ok(c, m) { console.log((c ? "  ok  " : " FAIL ") + m); if (!c) fail++; }
 
@@ -97,7 +108,18 @@ setTimeout(() => {
       ok(decoded.annotator_id === "ki" && decoded.annotations, "PUT-контент = валидный annot JSON (annotator " + decoded.annotator_id + ")");
       ok(ghPut.branch === "main", "PUT в ветку main");
     }
-    console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
-    process.exit(fail ? 1 : 0);
+    // 7) карта reasoning: гуттер, спан-полоса, λ-бар, глиф развилки (трасса загружена)
+    ok($$("#traceBody .gutter").length > 0, "гуттер-карта отрисован: " + $$("#traceBody .gutter").length + " строк");
+    ok($$("#traceBody .opband").some(b => b.style.background && b.style.background !== "transparent"), "спан-полоса окрашена");
+    ok($$("#traceBody .lam").some(b => b.style.width), "λ-бар имеет ширину");
+    ok($$("#traceBody .glyph").some(g => g.textContent === "◇"), "глиф развилки ◇ (branch) на карте");
+    // 8) режим «вся трасса»: рендерятся все сегменты
+    const it = ITEMS[1]; const full = TRACES[it.trace_file].segments.length;
+    $("#wholeBtn").click();
+    setTimeout(() => {
+      ok($$("#traceBody .seg").length === full, "вся трасса: " + $$("#traceBody .seg").length + " из " + full + " сегментов");
+      console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
+      process.exit(fail ? 1 : 0);
+    }, 60);
   }, 200);
 }, 500);
