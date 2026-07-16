@@ -217,3 +217,18 @@ mark{border-radius:3px;padding:0 1px}
 /* аффорданс копирования ссылки на строку: 🔗 при наведении на строку */
 .seg:hover .sid{color:var(--accent)}
 .seg:hover .sid::before{content:"🔗";margin-right:3px;font-size:10px}
+
+/* правая панель v3: выбранная строка */
+.sl-nav{display:flex;gap:6px;margin-bottom:6px}
+.sl-nav .primary{flex:1}
+.sl-op{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0}
+.sl-lbl{color:var(--muted);font-size:12px}
+.opchip{border-radius:8px;padding:1px 8px;font-size:10px;font-weight:600}
+.sl-dim{color:var(--muted);font-size:11px}
+.sl-lam{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;margin:2px 0}
+.sl-text{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;
+  white-space:pre-wrap;word-break:break-word;margin:6px 0}
+.sl-h{color:var(--muted);font-size:12px;margin:8px 0 4px}
+.sl-ev{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;
+  display:flex;flex-direction:column;gap:6px}
+.sl-ev.done{border-color:var(--good)}

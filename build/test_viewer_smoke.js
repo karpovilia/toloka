@@ -54,14 +54,14 @@ setTimeout(() => {
   ok($("#qLabel").textContent.includes("q1"), "открыта первая трасса: " + $("#qLabel").textContent.slice(0, 40));
   // 2) кандидаты + инлайн-чипы (3)
   ok($$("#traceBody .ev").length === 3, "инлайн-события: " + $$("#traceBody .ev").length);
-  ok($("#curEvent .ce-pos").textContent.includes("1 / 3"), "текущее событие 1/3: " + $("#curEvent .ce-pos").textContent);
+  ok($("#curEvent .ce-pos").textContent.includes("(сегмент) 3"), "правая панель = строка 3: " + $("#curEvent .ce-pos").textContent);
   // клик по гуттеру -> попап показывает операторный спан точки
   const gut = $('#traceBody .seg[data-seg-id="3"] .gutter');
   if (gut) gut.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 80, clientY: 80 }));
   const opchip = $("#drillpop .opchip");
   ok(opchip && opchip.textContent === "DERIVING", "клик по карте показал спан: " + (opchip ? opchip.textContent : "нет"));
   // тултипы: определение события в правой панели + тултип спана на opband
-  ok($("#curEvent .ce-def") && $("#curEvent .ce-def").textContent.includes("реверс"), "определение события в панели: " + ($("#curEvent .ce-def") ? $("#curEvent .ce-def").textContent : "нет"));
+  ok($$("#curEvent .ce-def").some(e => e.textContent.includes("реверс")), "определение события в панели строки");
   ok($$("#traceBody .opband").some(b => (b.title || "").includes("DERIVING —")), "тултип спана на карте (что кодирует)");
   ok(opchip && opchip.title.includes("DERIVING —"), "тултип на чипе спана в попапе: " + (opchip ? opchip.title : ""));
   ok($("#drillpop .dlink"), "в попапе есть кнопка ссылки на строку");
@@ -83,7 +83,7 @@ setTimeout(() => {
   ok($$("#traceBody .ev.done").length === 1, "чип помечен done: " + $$("#traceBody .ev.done").length);
   // 4) навигация j -> событие 2, отклоняем (клавиша 2)
   key("j");
-  ok($("#curEvent .ce-pos").textContent.includes("2 / 3"), "перешли к 2/3: " + $("#curEvent .ce-pos").textContent);
+  ok($("#curEvent .ce-pos").textContent.includes("(сегмент) 8"), "перешли к след. событию (сегмент 8): " + $("#curEvent .ce-pos").textContent);
   key("2");
   const a2 = JSON.parse(store.getItem("tv_annot::ki") || "{}");
   ok(a2["t1.json|s8|verify"] && a2["t1.json|s8|verify"].verdict === "✗", "✗ записан для verify@8");
