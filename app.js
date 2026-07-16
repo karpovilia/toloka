@@ -374,6 +374,9 @@ function drill(seg, evt) {
     if (sp) opline.appendChild(el("span", "dopr", ` (сегм. ${sp.a}–${sp.b - 1})`));
   } else opline.appendChild(el("span", "dopl", "спан: —"));
   pop.appendChild(opline);
+  const linkBtn = el("button", "dlink", "🔗 копировать ссылку на строку " + seg);
+  linkBtn.onclick = (e) => { e.stopPropagation(); copyLineLink(seg); };
+  pop.appendChild(linkBtn);
   const dist = lamByType(seg);
   if (dist) {
     const tot = dist.reduce((a, b) => a + b.lam, 0), max = Math.max(...dist.map(d => d.lam), 1e-6);

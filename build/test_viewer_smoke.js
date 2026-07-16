@@ -60,6 +60,8 @@ setTimeout(() => {
   if (gut) gut.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 80, clientY: 80 }));
   const opchip = $("#drillpop .opchip");
   ok(opchip && opchip.textContent === "DERIVING", "клик по карте показал спан: " + (opchip ? opchip.textContent : "нет"));
+  ok($("#drillpop .dlink"), "в попапе есть кнопка ссылки на строку");
+  if ($("#drillpop .dlink")) { $("#drillpop .dlink").dispatchEvent(new window.MouseEvent("click", { bubbles: true })); ok(window.location.hash.includes("seg=3"), "кнопка попапа скопировала ссылку на строку 3: " + window.location.hash); }
   // ссылка на строку: клик по номеру строки -> hash seg= + подсветка linked
   const sid5 = $('#traceBody .seg[data-seg-id="5"] .sid');
   if (sid5) sid5.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
