@@ -28,7 +28,7 @@ const S = {
   curTF: null, trace: null, cands: [], candBySeg: new Map(), cursor: 0,
   myAnnot: {}, pool: [], cfg: null, mapMeta: null,
   annotatorId: localStorage.getItem("tv_last_annotator") || "ki",
-  traces: {}, view: null, scrolling: false, wholeTrace: true,
+  traces: {}, view: null, scrolling: false, wholeTrace: true, linkedSeg: null,
 };
 
 const typeColor = (id) => { let h = 0; for (const c of (id || "")) h = (h * 31 + c.charCodeAt(0)) | 0; return PALETTE[Math.abs(h) % PALETTE.length]; };
@@ -168,11 +168,12 @@ async function openTrace(tf, opts = {}) {
   S.cands = tr ? buildCandidates(tr.events) : [];
   S.candBySeg = new Map();
   S.cands.forEach((c, i) => { if (!S.candBySeg.has(c.seg)) S.candBySeg.set(c.seg, []); S.candBySeg.get(c.seg).push(i); });
+  S.linkedSeg = (opts.seg != null && !isNaN(opts.seg)) ? opts.seg : null;
   if (opts.seg != null) { const k = S.cands.findIndex(c => c.seg === opts.seg); if (k >= 0) S.cursor = k; }
   const idx = S.index.find(x => x.trace_file === tf);
   $("#qLabel").textContent = idx ? `${idx.benchmark} · ${idx.model} · qid ${idx.question_id} · срез ${idx.slice} · ${idx.n_segments} сегм · ${S.cands.length} событий` : tf;
   renderTrace(true);
-  updateHash();
+  if (S.linkedSeg != null) setHashLine(S.linkedSeg); else updateHash();
 }
 
 /* карта: op/lam/events по сегменту */
@@ -227,11 +228,12 @@ function verifyChip(ci) {
   return chip;
 }
 function segRow(id, text, m) {
-  const row = el("div", "seg" + (id === cursorSeg() ? " cursorseg" : "")); row.dataset.segId = id;
+  const row = el("div", "seg" + (id === cursorSeg() ? " cursorseg" : "") + (id === S.linkedSeg ? " linked" : "")); row.dataset.segId = id;
   const g = gutter(id, m);
-  if (m) { g.style.cursor = "pointer"; g.title = "клик — распределение λ по типам + перейти сюда"; g.onclick = (e) => { e.stopPropagation(); jumpToSeg(id); drill(id, e); }; }
+  if (m) { g.style.cursor = "pointer"; g.title = "клик — спан + распределение λ по типам"; g.onclick = (e) => { e.stopPropagation(); jumpToSeg(id); drill(id, e); }; }
   row.appendChild(g);
-  row.appendChild(el("div", "sid", String(id)));
+  const sid = el("div", "sid", String(id)); sid.title = "🔗 копировать ссылку на строку " + id; sid.onclick = (e) => { e.stopPropagation(); copyLineLink(id); };
+  row.appendChild(sid);
   const right = el("div", "segright");
   const txt = el("div", "stext"); txt.innerHTML = highlightSeg(text); right.appendChild(txt);
   const cb = S.candBySeg.get(id);
@@ -256,10 +258,11 @@ function renderTrace(fresh) {
   if (!whole && S.view.lo > minId) body.appendChild(el("div", "moretop", "↑ ещё контекст"));
   for (let id = S.view.lo; id <= S.view.hi; id++) if (byId.has(id)) body.appendChild(segRow(id, byId.get(id), m));
   if (!whole && S.view.hi < maxId) body.appendChild(el("div", "morebot", "↓ ещё контекст"));
-  if (fresh) scrollToCursor();
+  if (fresh) { if (S.linkedSeg != null) scrollToSeg(S.linkedSeg); else scrollToCursor(); }
   renderCurEvent(); renderTraceProgress(); renderPeers();
 }
 function scrollToCursor() { const r = $(`#traceBody .seg[data-seg-id="${cursorSeg()}"]`); if (r && r.scrollIntoView) r.scrollIntoView({ block: "center" }); }
+function scrollToSeg(seg) { const r = $(`#traceBody .seg[data-seg-id="${seg}"]`); if (r && r.scrollIntoView) r.scrollIntoView({ block: "center" }); }
 
 function extend(dir) {
   const segs = segSource(), byId = new Map(segs.map(s => [s.seg_id, s.text])), m = traceMap(), body = $("#traceBody");
@@ -398,7 +401,15 @@ function applyHash(p) {
   openTrace(p.trace, { seg: p.seg != null ? parseInt(p.seg) : null });
   return true;
 }
-function shareLink() { updateHash(); const url = location.href; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast("ссылка скопирована"), () => toast(url)); else toast(url); }
+function shareLink() { updateHash(); copyUrl("ссылка скопирована"); }
+function setHashLine(seg) { const h = "#trace=" + encodeURIComponent(S.curTF) + "&seg=" + seg; if (h !== S._lastHash) { S._lastHash = h; try { history.replaceState(null, "", h); } catch { location.hash = h; } } }
+function copyUrl(msg) { const url = location.href; if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(() => toast(msg), () => toast(url)); else toast(url); }
+function copyLineLink(seg) {
+  S.linkedSeg = seg;
+  $$("#traceBody .seg.linked").forEach(r => r.classList.remove("linked"));
+  const row = $(`#traceBody .seg[data-seg-id="${seg}"]`); if (row) row.classList.add("linked");
+  setHashLine(seg); copyUrl("ссылка на строку " + seg + " скопирована");
+}
 
 /* ---------- export / import / GitHub ---------- */
 function annotPayload() { return { annotator_id: S.annotatorId, exported: new Date().toISOString(), tool: "toloka-v2", annotations: S.myAnnot }; }
@@ -432,6 +443,7 @@ function bind() {
   $("#ghOwner").value = g.owner || "karpovilia"; $("#ghRepo").value = g.repo || "toloka"; $("#ghBranch").value = g.branch || "main"; $("#ghPath").value = g.path || "annotations"; $("#ghToken").value = g.token || "";
   $("#ghSaveCfg").onclick = ghSave; $("#ghCommit").onclick = ghCommit;
   $("#shareBtn").onclick = shareLink;
+  $("#listToggle").onclick = () => { $("#main").classList.toggle("nolist"); $("#listToggle").classList.toggle("on"); };
   window.addEventListener("hashchange", () => { if (location.hash !== S._lastHash) applyHash(); });
   $("#prevEv").onclick = () => gotoCand(-1);
   $("#nextEv").onclick = () => gotoCand(1);
