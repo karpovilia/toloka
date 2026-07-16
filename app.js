@@ -22,6 +22,19 @@ const provClass = (t) => isReasonOps(t) ? " ro" : " ours";
 const provTitle = (t) => isReasonOps(t) ? "ReasonOps: " + REASONOPS_OP[t] : "наш тип";
 const CONFIRM = "✓", REJECT = "✗";
 const CHUNK = 20, EDGE = 140;
+// что кодирует операторный спан (из dual-label отчёта)
+const OP_DESC = {
+  SETUP: "постановка: переформулировка задачи, план, декомпозиция",
+  DERIVING: "деривация: ровная прямая выкладка/вычисление без реверсов",
+  EXPLORING: "разбор альтернатив/случаев/веток",
+  VERIFYING: "устойчивая проверка/пересчёт уже полученного",
+  REVISING: "восстановление после тупика/реверса — отмена и переделка",
+  CONCLUDING: "финализация и фиксация ответа",
+  GROUNDING: "работа с извлечёнными источниками (RAG)",
+};
+const opTitle = (op) => "спан " + op + (OP_DESC[op] ? " — " + OP_DESC[op] : "");
+const typeDesc = (t) => (S.model && S.model.typesById[t] && S.model.typesById[t].definition) || "";
+const typeTitle = (t) => provTitle(t) + (typeDesc(t) ? " — " + typeDesc(t) : "");
 
 const S = {
   model: null, index: [], filtered: [], tidx: 0,
@@ -190,14 +203,14 @@ function gutter(id, m) {
   const g = el("div", "gutter");
   const opName = m ? m.op.get(id) : null;
   const band = el("div", "opband"); band.style.background = opName ? OP_COLOR[opName] || "#333" : "transparent";
-  if (opName) band.title = "оператор: " + opName; g.appendChild(band);
+  if (opName) band.title = opTitle(opName); g.appendChild(band);
   const lamMax = (S.mapMeta && S.mapMeta.lam_max) || 1;
   const v = m && m.lam.length > id ? m.lam[id] : 0;
   const bar = el("div", "lam"); const frac = Math.max(0, Math.min(1, v / lamMax));
   bar.style.width = (2 + frac * 22).toFixed(1) + "px"; bar.style.opacity = (0.25 + 0.75 * frac).toFixed(2);
   bar.title = "λ(Hawkes) = " + (v || 0).toFixed(2); g.appendChild(bar);
   const o = m ? m.ev.get(id) : null; const gl = el("div", "glyphs");
-  if (o) for (const t of o.types) { const sp = el("span", "glyph", isFork(t) ? FORK[t] : "•"); sp.style.color = typeColor(t); sp.title = t; gl.appendChild(sp); }
+  if (o) for (const t of o.types) { const sp = el("span", "glyph", isFork(t) ? FORK[t] : "•"); sp.style.color = typeColor(t); sp.title = t + (typeDesc(t) ? " — " + typeDesc(t) : ""); gl.appendChild(sp); }
   g.appendChild(gl); return g;
 }
 
@@ -209,7 +222,7 @@ function verifyChip(ci) {
   const c = S.cands[ci], id = candId(S.curTF, c), v = vget(id);
   const chip = el("div", "ev" + (ci === S.cursor ? " cur" : "") + (v ? " done" : "")); chip.dataset.cid = id; chip.dataset.ci = ci;
   const tt = el("span", "evtype" + provClass(c.type), (isFork(c.type) ? FORK[c.type] + " " : "") + c.type);
-  const col = typeColor(c.type); tt.style.background = col; tt.style.color = contrast(col); tt.title = provTitle(c.type);
+  const col = typeColor(c.type); tt.style.background = col; tt.style.color = contrast(col); tt.title = typeTitle(c.type);
   chip.appendChild(tt);
   const ag = el("span", "evag"); for (const a of c.agents) { const d = el("span", "adot"); d.style.background = AGENT_COLOR[a] || "#666"; d.title = AGENT_LABEL[a] || a; ag.appendChild(d); }
   chip.appendChild(ag);
@@ -314,7 +327,8 @@ function renderCurEvent() {
   const id = candId(S.curTF, c), v = vget(id);
   box.appendChild(el("div", "ce-pos", `событие ${S.cursor + 1} / ${S.cands.length} · сегмент ${c.seg}`));
   const tt = el("div", "ce-type" + provClass(c.type), (isFork(c.type) ? FORK[c.type] + " " : "") + c.type);
-  const col = typeColor(c.type); tt.style.background = col; tt.style.color = contrast(col); box.appendChild(tt);
+  const col = typeColor(c.type); tt.style.background = col; tt.style.color = contrast(col); tt.title = typeTitle(c.type); box.appendChild(tt);
+  if (typeDesc(c.type)) box.appendChild(el("div", "ce-def", typeDesc(c.type)));
   const ag = el("div", "ce-ag", "нашли: " + c.agents.map(a => AGENT_LABEL[a] || a).join(", ")); box.appendChild(ag);
   const acts = el("div", "ce-acts");
   const bc = el("button", "vbig ok" + (v === CONFIRM ? " on" : ""), "✓ да, это " + c.type); bc.onclick = () => setVerdict(c, CONFIRM);
@@ -367,13 +381,14 @@ function drill(seg, evt) {
   const opline = el("div", "dop");
   if (op) {
     opline.appendChild(el("span", "dopl", "спан: "));
-    const chip = el("span", "opchip", op); chip.style.background = OP_COLOR[op] || "#333"; chip.style.color = contrast(OP_COLOR[op] || "#333");
+    const chip = el("span", "opchip", op); chip.style.background = OP_COLOR[op] || "#333"; chip.style.color = contrast(OP_COLOR[op] || "#333"); chip.title = opTitle(op);
     opline.appendChild(chip);
     // границы спана
     const sp = (S.trace && S.trace.spans || []).find(s => seg >= s.a && seg < s.b);
     if (sp) opline.appendChild(el("span", "dopr", ` (сегм. ${sp.a}–${sp.b - 1})`));
   } else opline.appendChild(el("span", "dopl", "спан: —"));
   pop.appendChild(opline);
+  if (op && OP_DESC[op]) pop.appendChild(el("div", "dopdesc", OP_DESC[op]));
   const linkBtn = el("button", "dlink", "🔗 копировать ссылку на строку " + seg);
   linkBtn.onclick = (e) => { e.stopPropagation(); copyLineLink(seg); };
   pop.appendChild(linkBtn);
@@ -381,7 +396,7 @@ function drill(seg, evt) {
   if (dist) {
     const tot = dist.reduce((a, b) => a + b.lam, 0), max = Math.max(...dist.map(d => d.lam), 1e-6);
     pop.appendChild(el("div", "dsub", `Σλ = ${tot.toFixed(2)} · интенсивность по типам`));
-    for (const d of dist) { if (d.lam < 1e-3 && !d.hasEv) continue; const row = el("div", "drow"); const nm = el("span", "dtype" + provClass(d.type), d.type); nm.style.color = typeColor(d.type); row.appendChild(nm); const bw = el("span", "dbarwrap"), bar = el("span", "dbar"); bar.style.width = (3 + 92 * d.lam / max).toFixed(0) + "px"; bar.style.background = typeColor(d.type); bw.appendChild(bar); row.appendChild(bw); row.appendChild(el("span", "dval", d.lam.toFixed(3))); pop.appendChild(row); }
+    for (const d of dist) { if (d.lam < 1e-3 && !d.hasEv) continue; const row = el("div", "drow"); const nm = el("span", "dtype" + provClass(d.type), d.type); nm.style.color = typeColor(d.type); nm.title = typeTitle(d.type); row.appendChild(nm); const bw = el("span", "dbarwrap"), bar = el("span", "dbar"); bar.style.width = (3 + 92 * d.lam / max).toFixed(0) + "px"; bar.style.background = typeColor(d.type); bw.appendChild(bar); row.appendChild(bw); row.appendChild(el("span", "dval", d.lam.toFixed(3))); pop.appendChild(row); }
   }
   document.body.appendChild(pop);
   const x = Math.min((evt ? evt.clientX : 200) + 10, window.innerWidth - 250), y = Math.min((evt ? evt.clientY : 120) + 4, window.innerHeight - pop.offsetHeight - 12);
