@@ -38,7 +38,7 @@ const typeTitle = (t) => provTitle(t) + (typeDesc(t) ? " — " + typeDesc(t) : "
 
 const S = {
   model: null, index: [], filtered: [], tidx: 0,
-  curTF: null, trace: null, cands: [], candBySeg: new Map(), cursor: 0,
+  curTF: null, trace: null, cands: [], candBySeg: new Map(), selSeg: null,
   myAnnot: {}, pool: [], cfg: null, mapMeta: null,
   annotatorId: localStorage.getItem("tv_last_annotator") || "ki",
   traces: {}, view: null, scrolling: false, wholeTrace: true, linkedSeg: null,
@@ -61,7 +61,7 @@ function setVerdict(cand, v) {
   if (cur === v) delete S.myAnnot[id];
   else S.myAnnot[id] = { verdict: v, notes: (S.myAnnot[id] && S.myAnnot[id].notes) || "", updated: new Date().toISOString() };
   saveMyAnnot();
-  updateCandDom(id); renderCurEvent(); renderTraceProgress(); renderProgress(); renderTraceRow(S.tidx);
+  updateCandDom(id); renderSelLine(); renderTraceProgress(); renderProgress(); renderTraceRow(S.tidx);
 }
 function verdictLabel(v) { return v === CONFIRM ? "✓ да" : v === REJECT ? "✗ нет (FP)" : v ? "→ " + v : ""; }
 
@@ -175,14 +175,14 @@ function renderTraceRow(pos) {
 /* ---------- open + render trace ---------- */
 const curTrace = () => S.filtered.length ? S.index[S.filtered[S.tidx]] : null;
 async function openTrace(tf, opts = {}) {
-  S.curTF = tf; S.cursor = 0; S.view = null;
+  S.curTF = tf; S.view = null;
   const tr = await loadTrace(tf);
   S.trace = tr;
   S.cands = tr ? buildCandidates(tr.events) : [];
   S.candBySeg = new Map();
   S.cands.forEach((c, i) => { if (!S.candBySeg.has(c.seg)) S.candBySeg.set(c.seg, []); S.candBySeg.get(c.seg).push(i); });
   S.linkedSeg = (opts.seg != null && !isNaN(opts.seg)) ? opts.seg : null;
-  if (opts.seg != null) { const k = S.cands.findIndex(c => c.seg === opts.seg); if (k >= 0) S.cursor = k; }
+  S.selSeg = (opts.seg != null && !isNaN(opts.seg)) ? opts.seg : (S.cands.length ? S.cands[0].seg : (tr && tr.segments && tr.segments.length ? tr.segments[0].seg_id : 0));
   const idx = S.index.find(x => x.trace_file === tf);
   $("#qLabel").textContent = idx ? `${idx.benchmark} · ${idx.model} · qid ${idx.question_id} · срез ${idx.slice} · ${idx.n_segments} сегм · ${S.cands.length} событий` : tf;
   renderTrace(true);
@@ -218,26 +218,26 @@ function highlightSeg(text) {
   // подсветить триггер-цитаты событий этого сегмента
   return esc(text);
 }
+function domTypes() { return (S.model && S.model.byDomain && (S.model.byDomain[(curTrace() || {}).domain] || Object.keys(S.model.typesById))) || []; }
 function verifyChip(ci) {
   const c = S.cands[ci], id = candId(S.curTF, c), v = vget(id);
-  const chip = el("div", "ev" + (ci === S.cursor ? " cur" : "") + (v ? " done" : "")); chip.dataset.cid = id; chip.dataset.ci = ci;
+  const chip = el("div", "ev" + (v ? " done" : "")); chip.dataset.cid = id; chip.dataset.ci = ci;
   const tt = el("span", "evtype" + provClass(c.type), (isFork(c.type) ? FORK[c.type] + " " : "") + c.type);
   const col = typeColor(c.type); tt.style.background = col; tt.style.color = contrast(col); tt.title = typeTitle(c.type);
   chip.appendChild(tt);
   const ag = el("span", "evag"); for (const a of c.agents) { const d = el("span", "adot"); d.style.background = AGENT_COLOR[a] || "#666"; d.title = AGENT_LABEL[a] || a; ag.appendChild(d); }
   chip.appendChild(ag);
   const acts = el("span", "evacts");
-  const bc = el("button", "vb ok" + (v === CONFIRM ? " on" : ""), "✓"); bc.title = "подтвердить (1)"; bc.onclick = (e) => { e.stopPropagation(); S.cursor = ci; setVerdict(c, CONFIRM); };
-  const bx = el("button", "vb no" + (v === REJECT ? " on" : ""), "✗"); bx.title = "отклонить, FP (2)"; bx.onclick = (e) => { e.stopPropagation(); S.cursor = ci; setVerdict(c, REJECT); };
+  const bc = el("button", "vb ok" + (v === CONFIRM ? " on" : ""), "✓"); bc.title = "подтвердить"; bc.onclick = (e) => { e.stopPropagation(); setVerdict(c, CONFIRM); };
+  const bx = el("button", "vb no" + (v === REJECT ? " on" : ""), "✗"); bx.title = "отклонить, FP"; bx.onclick = (e) => { e.stopPropagation(); setVerdict(c, REJECT); };
   acts.appendChild(bc); acts.appendChild(bx);
   const sel = el("select", "retype"); sel.title = "другой тип";
   sel.appendChild(new Option("тип…", ""));
-  for (const id2 of (S.model && S.model.byDomain && (S.model.byDomain[(curTrace() || {}).domain] || Object.keys(S.model.typesById))) || []) if (id2 !== c.type) sel.appendChild(new Option(id2, id2));
+  for (const id2 of domTypes()) if (id2 !== c.type) sel.appendChild(new Option(id2, id2));
   sel.value = (v && v !== CONFIRM && v !== REJECT) ? v : "";
-  sel.onchange = (e) => { e.stopPropagation(); if (sel.value) { S.cursor = ci; setVerdict(c, sel.value); } };
+  sel.onchange = (e) => { e.stopPropagation(); if (sel.value) setVerdict(c, sel.value); };
   acts.appendChild(sel);
   chip.appendChild(acts);
-  chip.onclick = () => { S.cursor = ci; syncCursor(); };
   return chip;
 }
 function segRow(id, text, m) {
@@ -247,13 +247,13 @@ function segRow(id, text, m) {
   row.appendChild(g);
   const sid = el("div", "sid", String(id)); sid.title = "🔗 копировать ссылку на строку " + id; sid.onclick = (e) => { e.stopPropagation(); copyLineLink(id); };
   row.appendChild(sid);
-  const right = el("div", "segright");
+  const right = el("div", "segright"); right.style.cursor = "pointer"; right.onclick = () => selectSeg(id);
   const txt = el("div", "stext"); txt.innerHTML = highlightSeg(text); right.appendChild(txt);
   const cb = S.candBySeg.get(id);
   if (cb) { const box = el("div", "evbox"); for (const ci of cb) box.appendChild(verifyChip(ci)); right.appendChild(box); }
   row.appendChild(right); return row;
 }
-const cursorSeg = () => (S.cands[S.cursor] ? S.cands[S.cursor].seg : -1);
+const cursorSeg = () => (S.selSeg == null ? -1 : S.selSeg);
 function segSource() { return (S.trace && S.trace.segments) ? S.trace.segments : []; }
 
 function renderTrace(fresh) {
@@ -272,7 +272,7 @@ function renderTrace(fresh) {
   for (let id = S.view.lo; id <= S.view.hi; id++) if (byId.has(id)) body.appendChild(segRow(id, byId.get(id), m));
   if (!whole && S.view.hi < maxId) body.appendChild(el("div", "morebot", "↓ ещё контекст"));
   if (fresh) { if (S.linkedSeg != null) scrollToSeg(S.linkedSeg); else scrollToCursor(); }
-  renderCurEvent(); renderTraceProgress(); renderPeers();
+  renderSelLine(); renderTraceProgress();
 }
 function scrollToCursor() { const r = $(`#traceBody .seg[data-seg-id="${cursorSeg()}"]`); if (r && r.scrollIntoView) r.scrollIntoView({ block: "center" }); }
 function scrollToSeg(seg) { const r = $(`#traceBody .seg[data-seg-id="${seg}"]`); if (r && r.scrollIntoView) r.scrollIntoView({ block: "center" }); }
@@ -306,52 +306,81 @@ function jumpToSeg(seg) {
   }
   const r = $(`#traceBody .seg[data-seg-id="${seg}"]`); if (r && r.scrollIntoView) r.scrollIntoView({ block: "center" });
 }
-function syncCursor() {
-  $$("#traceBody .ev.cur").forEach(e => e.classList.remove("cur"));
-  $$("#traceBody .seg.cursorseg").forEach(e => e.classList.remove("cursorseg"));
-  const c = S.cands[S.cursor]; if (!c) return;
-  const chip = $(`#traceBody .ev[data-ci="${S.cursor}"]`); if (chip) chip.classList.add("cur");
-  const row = $(`#traceBody .seg[data-seg-id="${c.seg}"]`); if (row) { row.classList.add("cursorseg"); if (row.scrollIntoView) row.scrollIntoView({ block: "center" }); }
-  renderCurEvent();
+const eventSegs = () => [...S.candBySeg.keys()].sort((a, b) => a - b);
+function selectSeg(seg, scroll) {
+  S.selSeg = seg;
+  let row = $(`#traceBody .seg[data-seg-id="${seg}"]`);
+  if (!row && !S.wholeTrace && S.view) {
+    S.view.lo = Math.max(S.view.minId, Math.min(S.view.lo, seg - 3));
+    S.view.hi = Math.min(S.view.maxId, Math.max(S.view.hi, seg + 3)); renderTrace(false);
+    row = $(`#traceBody .seg[data-seg-id="${seg}"]`);
+  }
+  $$("#traceBody .seg.cursorseg").forEach(r => r.classList.remove("cursorseg"));
+  if (row) { row.classList.add("cursorseg"); if (scroll && row.scrollIntoView) row.scrollIntoView({ block: "center" }); }
+  renderSelLine(); updateHash();
 }
-function gotoCand(dir) {
-  if (!S.cands.length) return;
-  S.cursor = (S.cursor + dir + S.cands.length) % S.cands.length;
-  if (!S.wholeTrace) jumpToSeg(S.cands[S.cursor].seg);
-  syncCursor(); updateHash();
+function gotoEvent(dir) {
+  const segs = eventSegs(); if (!segs.length) { toast("на трассе нет событий"); return; }
+  const cur = S.selSeg == null ? (dir > 0 ? -1 : Infinity) : S.selSeg;
+  let target = dir > 0 ? segs.find(s => s > cur) : null;
+  if (dir < 0) for (let i = segs.length - 1; i >= 0; i--) { if (segs[i] < cur) { target = segs[i]; break; } }
+  if (target == null) target = dir > 0 ? segs[0] : segs[segs.length - 1];   // зациклить
+  selectSeg(target, true);
 }
 
-function renderCurEvent() {
-  const box = $("#curEvent"); box.innerHTML = "";
-  const c = S.cands[S.cursor]; if (!c) { box.appendChild(el("div", "muted", "событий нет")); return; }
-  const id = candId(S.curTF, c), v = vget(id);
-  box.appendChild(el("div", "ce-pos", `событие ${S.cursor + 1} / ${S.cands.length} · сегмент ${c.seg}`));
-  const tt = el("div", "ce-type" + provClass(c.type), (isFork(c.type) ? FORK[c.type] + " " : "") + c.type);
+/* правая панель = инфа о ВЫБРАННОЙ строке (сегменте) */
+function selEvent(ci) {
+  const c = S.cands[ci], id = candId(S.curTF, c), v = vget(id);
+  const box = el("div", "sl-ev" + (v ? " done" : ""));
+  const tt = el("span", "ce-type" + provClass(c.type), (isFork(c.type) ? FORK[c.type] + " " : "") + c.type);
   const col = typeColor(c.type); tt.style.background = col; tt.style.color = contrast(col); tt.title = typeTitle(c.type); box.appendChild(tt);
   if (typeDesc(c.type)) box.appendChild(el("div", "ce-def", typeDesc(c.type)));
-  const ag = el("div", "ce-ag", "нашли: " + c.agents.map(a => AGENT_LABEL[a] || a).join(", ")); box.appendChild(ag);
+  box.appendChild(el("div", "ce-ag", "нашли: " + c.agents.map(a => AGENT_LABEL[a] || a).join(", ")));
   const acts = el("div", "ce-acts");
-  const bc = el("button", "vbig ok" + (v === CONFIRM ? " on" : ""), "✓ да, это " + c.type); bc.onclick = () => setVerdict(c, CONFIRM);
-  const bx = el("button", "vbig no" + (v === REJECT ? " on" : ""), "✗ нет (ложное)"); bx.onclick = () => setVerdict(c, REJECT);
+  const bc = el("button", "vbig ok" + (v === CONFIRM ? " on" : ""), "✓ да"); bc.onclick = () => setVerdict(c, CONFIRM);
+  const bx = el("button", "vbig no" + (v === REJECT ? " on" : ""), "✗ нет"); bx.onclick = () => setVerdict(c, REJECT);
   acts.appendChild(bc); acts.appendChild(bx); box.appendChild(acts);
   const sel = el("select", "ce-retype"); sel.appendChild(new Option("→ другой тип…", ""));
-  for (const id2 of (S.model && S.model.byDomain && (S.model.byDomain[(curTrace() || {}).domain] || Object.keys(S.model.typesById))) || []) if (id2 !== c.type) sel.appendChild(new Option(id2, id2));
+  for (const id2 of domTypes()) if (id2 !== c.type) sel.appendChild(new Option(id2, id2));
   sel.value = (v && v !== CONFIRM && v !== REJECT) ? v : ""; sel.onchange = () => { if (sel.value) setVerdict(c, sel.value); };
   box.appendChild(sel);
   if (v) box.appendChild(el("div", "ce-ver", "вердикт: " + verdictLabel(v)));
   const note = el("textarea", "ce-note"); note.rows = 2; note.placeholder = "заметка…"; note.value = (S.myAnnot[id] && S.myAnnot[id].notes) || "";
   note.onchange = () => { if (!S.myAnnot[id]) S.myAnnot[id] = { verdict: null, notes: "", updated: null }; S.myAnnot[id].notes = note.value; S.myAnnot[id].updated = new Date().toISOString(); saveMyAnnot(); };
   box.appendChild(note);
+  for (const p of S.pool) { const pr = p.annotations && p.annotations[id]; if (pr && pr.verdict) box.appendChild(el("div", "peer", `👤 ${p.annotator_id}: ${verdictLabel(pr.verdict)}`)); }
+  return box;
+}
+function renderSelLine() {
+  const box = $("#curEvent"); box.innerHTML = "";
+  const seg = S.selSeg;
+  if (seg == null || !S.trace) { box.appendChild(el("div", "muted", "выбери строку слева")); return; }
+  const acts = el("div", "sl-nav");
+  const pe = el("button", "btn small", "◀ соб."); pe.onclick = () => gotoEvent(-1);
+  const ne = el("button", "btn small primary", "перейти к след. событию ▶"); ne.onclick = () => gotoEvent(1);
+  acts.appendChild(pe); acts.appendChild(ne); box.appendChild(acts);
+  box.appendChild(el("div", "ce-pos", "строка (сегмент) " + seg));
+  const m = traceMap(); const op = m ? m.op.get(seg) : null;
+  if (op) {
+    const opl = el("div", "sl-op"); opl.appendChild(el("span", "sl-lbl", "спан: "));
+    const chip = el("span", "opchip", op); chip.style.background = OP_COLOR[op] || "#333"; chip.style.color = contrast(OP_COLOR[op] || "#333"); chip.title = opTitle(op);
+    opl.appendChild(chip);
+    const sp = (S.trace.spans || []).find(s => seg >= s.a && seg < s.b); if (sp) opl.appendChild(el("span", "sl-dim", ` (${sp.a}–${sp.b - 1})`));
+    box.appendChild(opl);
+    if (OP_DESC[op]) box.appendChild(el("div", "ce-def", OP_DESC[op]));
+  }
+  const lam = m && m.lam.length > seg ? m.lam[seg] : null;
+  if (lam != null) { const lr = el("div", "sl-lam"); lr.appendChild(el("span", "sl-lbl", "λ Hawkes: " + lam.toFixed(2) + " ")); const b = el("button", "btn small", "распределение"); b.onclick = (e) => drill(seg, e); lr.appendChild(b); box.appendChild(lr); }
+  const st = (S.trace.segments.find(s => s.seg_id === seg) || {}).text || "";
+  box.appendChild(el("div", "sl-text", st));
+  const lb = el("button", "btn small", "🔗 ссылка на строку"); lb.onclick = () => copyLineLink(seg); box.appendChild(lb);
+  const cb = S.candBySeg.get(seg) || [];
+  box.appendChild(el("div", "sl-h", cb.length ? "события здесь (" + cb.length + "):" : "событий на этой строке нет"));
+  for (const ci of cb) box.appendChild(selEvent(ci));
 }
 function renderTraceProgress() {
   const done = verifiedCount(S.curTF);
   $("#traceProgress").textContent = `на трассе размечено: ${done} / ${S.cands.length}`;
-}
-function renderPeers() {
-  const box = $("#peers"); box.innerHTML = "";
-  const c = S.cands[S.cursor]; if (!c) return;
-  const id = candId(S.curTF, c);
-  for (const p of S.pool) { const pr = p.annotations && p.annotations[id]; if (pr && pr.verdict) { const d = el("div", "peer"); d.textContent = `👤 ${p.annotator_id}: ${verdictLabel(pr.verdict)}`; box.appendChild(d); } }
 }
 function updateCandDom(id) {
   const v = vget(id);
@@ -408,7 +437,7 @@ function parseHash() { const p = {}; for (const kv of location.hash.replace(/^#/
 function updateHash() {
   if (!S.curTF) return;
   let h = "#trace=" + encodeURIComponent(S.curTF);
-  if (S.cands[S.cursor]) h += "&seg=" + S.cands[S.cursor].seg;
+  if (S.selSeg != null) h += "&seg=" + S.selSeg;
   if (h !== S._lastHash) { S._lastHash = h; try { history.replaceState(null, "", h); } catch { location.hash = h; } }
 }
 function applyHash(p) {
@@ -463,8 +492,8 @@ function bind() {
   $("#shareBtn").onclick = shareLink;
   $("#listToggle").onclick = () => { $("#main").classList.toggle("nolist"); $("#listToggle").classList.toggle("on"); };
   window.addEventListener("hashchange", () => { if (location.hash !== S._lastHash) applyHash(); });
-  $("#prevEv").onclick = () => gotoCand(-1);
-  $("#nextEv").onclick = () => gotoCand(1);
+  $("#prevEv").onclick = () => gotoEvent(-1);
+  $("#nextEv").onclick = () => gotoEvent(1);
   $("#wholeBtn").onclick = () => { S.wholeTrace = !S.wholeTrace; $("#wholeBtn").classList.toggle("on", S.wholeTrace); renderTrace(true); };
   $("#wholeBtn").classList.toggle("on", S.wholeTrace);
   $("#ctxRadius").onchange = () => renderTrace(true);
@@ -473,14 +502,14 @@ function bind() {
   ["textSearch", "fBench", "fSlice", "fAgent", "fMine"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
   document.addEventListener("keydown", ev => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
-    if (!S.cands.length) { if (ev.key === "[" ) selTrace(-1); else if (ev.key === "]") selTrace(1); return; }
-    const c = S.cands[S.cursor];
-    if (ev.key === "j" || ev.key === "n" || ev.key === "ArrowDown") gotoCand(1);
-    else if (ev.key === "k" || ev.key === "p" || ev.key === "ArrowUp") gotoCand(-1);
-    else if (ev.key === "1" && c) setVerdict(c, CONFIRM);
+    if (ev.key === "[") return selTrace(-1);
+    if (ev.key === "]") return selTrace(1);
+    if (ev.key === "j" || ev.key === "n" || ev.key === "ArrowDown") return gotoEvent(1);
+    if (ev.key === "k" || ev.key === "p" || ev.key === "ArrowUp") return gotoEvent(-1);
+    // 1/2 — вердикт первому событию на выбранной строке
+    const cb = S.candBySeg.get(S.selSeg); const c = cb && cb.length ? S.cands[cb[0]] : null;
+    if (ev.key === "1" && c) setVerdict(c, CONFIRM);
     else if (ev.key === "2" && c) setVerdict(c, REJECT);
-    else if (ev.key === "[") selTrace(-1);
-    else if (ev.key === "]") selTrace(1);
   });
 }
 function selTrace(d) { if (!S.filtered.length) return; S.tidx = (S.tidx + d + S.filtered.length) % S.filtered.length; renderTraceList(); openTrace(S.index[S.filtered[S.tidx]].trace_file); }
