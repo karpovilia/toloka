@@ -214,3 +214,6 @@ mark{border-radius:3px;padding:0 1px}
 .drillpop .dlink:hover{border-color:var(--accent)}
 .ce-def{color:var(--muted);font-size:11px;line-height:1.4}
 .drillpop .dopdesc{color:var(--muted);font-size:10px;line-height:1.35;margin:2px 0 4px}
+/* аффорданс копирования ссылки на строку: 🔗 при наведении на строку */
+.seg:hover .sid{color:var(--accent)}
+.seg:hover .sid::before{content:"🔗";margin-right:3px;font-size:10px}
