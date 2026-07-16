@@ -82,8 +82,14 @@
     <div class="ctxbar">
       <span>окно ±</span>
       <input type="number" id="ctxRadius" value="12" min="0" max="60" step="1">
-      <span>сегм. · листай — подгрузит больше</span>
+      <span>сегм.</span>
+      <button class="btn small" id="wholeBtn" title="показать трассу целиком">вся трасса</button>
       <button class="btn small" id="toFocus" title="к спорному сегменту">↻ фокус</button>
+      <div class="maplegend" id="mapLegend">
+        <span class="mlt">карта:</span>
+        <span class="mlop" style="background:#6e56cf">SETUP</span><span class="mlop" style="background:#4c8dff">DERIVING</span><span class="mlop" style="background:#f76b15">EXPLORING</span><span class="mlop" style="background:#12a594">VERIFYING</span><span class="mlop" style="background:#e5484d">REVISING</span><span class="mlop" style="background:#46a758">CONCLUDING</span><span class="mlop" style="background:#8e4ec6">GROUNDING</span>
+        <span class="mlsep">·</span><span class="mlt">λ Hawkes · развилки ◇ branch ◄ backtrack ✗ failed</span>
+      </div>
     </div>
     <div id="traceBody"></div>
   </section>

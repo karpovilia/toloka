@@ -62,8 +62,18 @@ button,input,select,textarea{font:inherit;color:inherit}
 .ctxbar{display:flex;align-items:center;gap:8px;padding:6px 12px;color:var(--muted);border-bottom:1px solid var(--line)}
 .ctxbar input{width:56px;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;padding:3px 6px}
 #traceBody{overflow-y:auto;flex:1;padding:8px 12px}
-.seg{display:flex;gap:10px;padding:3px 4px;border-radius:6px}
+.seg{display:flex;gap:8px;padding:3px 4px;border-radius:6px;align-items:stretch}
 .seg.focus{background:#16233c;outline:1px solid var(--accent)}
+/* карта reasoning: вертикальный гуттер на сегмент */
+.gutter{display:flex;align-items:center;gap:3px;width:58px;flex-shrink:0}
+.opband{width:4px;align-self:stretch;min-height:16px;border-radius:2px}
+.lam{height:7px;border-radius:2px;background:#e5484d;flex-shrink:0}
+.glyphs{display:flex;gap:1px;flex-wrap:wrap;max-width:20px;font-size:10px;line-height:1.05}
+.glyph{display:inline-block}
+.maplegend{display:flex;align-items:center;gap:4px;flex-wrap:wrap;font-size:10px;color:var(--muted);margin-left:10px}
+.maplegend .mlop{color:#0b0d12;border-radius:8px;padding:0 5px;font-size:9px}
+.maplegend .mlsep{color:var(--line2)}
+.btn.small.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
 .sid{color:var(--muted);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;user-select:none}
 .stext{flex:1;white-space:pre-wrap;word-break:break-word}
 mark{border-radius:3px;padding:0 1px}

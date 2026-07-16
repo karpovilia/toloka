@@ -30,13 +30,21 @@ const isReasonOps = (t) => Object.prototype.hasOwnProperty.call(REASONOPS_OP, t)
 const provClass = (t) => (t === NONE || t === UNCLEAR) ? "" : (isReasonOps(t) ? " ro" : " ours");
 const provTitle = (t) => isReasonOps(t) ? "ReasonOps: " + REASONOPS_OP[t] : (t === NONE || t === UNCLEAR ? "" : "наш тип");
 
+// карта reasoning: цвета операторных спанов и глифы развилок
+const OP_COLOR = { SETUP: "#6e56cf", DERIVING: "#4c8dff", EXPLORING: "#f76b15", VERIFYING: "#12a594", REVISING: "#e5484d", CONCLUDING: "#46a758", GROUNDING: "#8e4ec6" };
+const FORK = { branch: "◇", backtrack: "◄", failed_attempt: "✗" };
+const isFork = (t) => Object.prototype.hasOwnProperty.call(FORK, t);
+const typeGlyphColor = (t) => ({ verify: "#12a594", subgoal_done: "#46a758", commit: "#ffb224" }[t] || "#8b93a5");
+
 const S = {
   model: null, items: [], filtered: [], idx: 0,
   annotatorId: localStorage.getItem("tv_last_annotator") || "ki",
   myAnnot: {}, pool: [], cfg: null,
-  traces: {},                 // trace_file -> {segments:[{seg_id,text}]} | null
+  traces: {},                 // trace_file -> {segments, events, spans, lam, agents} | null
   view: null,                 // {item, lo, hi, minId, maxId} текущее окно контекста
   scrolling: false,
+  mapMeta: null,              // trace_maps_meta.json (hawkes params, lam_max, operators)
+  wholeTrace: false,          // режим «вся трасса»
 };
 
 const typeColor = (id) => { if (id === NONE) return "#8b93a5"; if (id === UNCLEAR) return "#ffb224"; let h = 0; for (const c of (id || "")) h = (h * 31 + c.charCodeAt(0)) | 0; return PALETTE[Math.abs(h) % PALETTE.length]; };
@@ -158,9 +166,52 @@ function highlight(text, it) {
   for (const [needle, col] of marks) { const e = esc(needle); if (e && html.includes(e)) html = html.split(e).join(`<mark style="background:${col};color:${contrast(col)}">${e}</mark>`); }
   return html;
 }
-function segRow(id, text, it, focusSet) {
+function traceMap(it) {
+  const tr = S.traces[it.trace_file];
+  if (!tr || !tr.segments) return null;
+  if (tr._map) return tr._map;
+  const op = new Map();
+  for (const s of (tr.spans || [])) for (let i = s.a; i < s.b; i++) op.set(i, s.op);
+  const ev = new Map();
+  for (const e of (tr.events || [])) {
+    if (!ev.has(e.s)) ev.set(e.s, { types: new Set(), agents: new Set(), fork: false });
+    const o = ev.get(e.s); o.types.add(e.t); o.agents.add(e.a); if (isFork(e.t)) o.fork = true;
+  }
+  tr._map = { op, ev, lam: tr.lam || [] };
+  return tr._map;
+}
+
+function gutter(id, m) {
+  const g = el("div", "gutter");
+  const opName = m ? m.op.get(id) : null;
+  const band = el("div", "opband"); band.style.background = opName ? OP_COLOR[opName] || "#333" : "transparent";
+  if (opName) band.title = "оператор: " + opName;
+  g.appendChild(band);
+  const lamMax = (S.mapMeta && S.mapMeta.lam_max) || 1;
+  const v = m && m.lam.length > id ? m.lam[id] : 0;
+  const bar = el("div", "lam"); const frac = Math.max(0, Math.min(1, v / lamMax));
+  bar.style.width = (2 + frac * 22).toFixed(1) + "px";
+  bar.style.opacity = (0.25 + 0.75 * frac).toFixed(2);
+  bar.title = "λ(Hawkes) = " + (v || 0).toFixed(2);
+  g.appendChild(bar);
+  const o = m ? m.ev.get(id) : null;
+  const gl = el("div", "glyphs");
+  if (o) {
+    for (const t of o.types) {
+      const sp = el("span", "glyph", isFork(t) ? FORK[t] : "•");
+      sp.style.color = isFork(t) ? typeColor(t) : typeGlyphColor(t);
+      sp.title = t + " · " + [...o.agents].join(",");
+      gl.appendChild(sp);
+    }
+  }
+  g.appendChild(gl);
+  return g;
+}
+
+function segRow(id, text, it, focusSet, m) {
   const focus = focusSet.has(id);
   const row = el("div", "seg" + (focus ? " focus" : "")); row.dataset.segId = id;
+  row.appendChild(gutter(id, m));
   row.appendChild(el("div", "sid", String(id)));
   const txt = el("div", "stext");
   if (focus) txt.innerHTML = highlight(text, it); else txt.textContent = text;
@@ -175,35 +226,39 @@ function renderContext(it, fresh) {
   const ids = segs.map(s => s.seg_id);
   const minId = ids.length ? Math.min(...ids) : it.seg_id, maxId = ids.length ? Math.max(...ids) : it.seg_id;
   const radius = parseInt($("#ctxRadius").value) || 12;
+  const whole = S.wholeTrace && S.traces[it.trace_file];
   if (fresh || !S.view || S.view.item !== it.item_id) {
-    S.view = { item: it.item_id, lo: Math.max(minId, it.seg_id - radius), hi: Math.min(maxId, it.seg_id + radius), minId, maxId };
-  } else { S.view.minId = minId; S.view.maxId = maxId; }
+    S.view = whole
+      ? { item: it.item_id, lo: minId, hi: maxId, minId, maxId }
+      : { item: it.item_id, lo: Math.max(minId, it.seg_id - radius), hi: Math.min(maxId, it.seg_id + radius), minId, maxId };
+  } else { S.view.minId = minId; S.view.maxId = maxId; if (whole) { S.view.lo = minId; S.view.hi = maxId; } }
   const focusSet = new Set(it.segs || [it.seg_id]);
+  const m = traceMap(it);
   body.innerHTML = "";
-  if (S.view.lo > minId) body.appendChild(el("div", "moretop", "↑ листай вверх — ещё контекст"));
-  for (let id = S.view.lo; id <= S.view.hi; id++) if (byId.has(id)) body.appendChild(segRow(id, byId.get(id), it, focusSet));
-  if (S.view.hi < maxId) body.appendChild(el("div", "morebot", "↓ листай вниз — ещё контекст"));
+  if (!whole && S.view.lo > minId) body.appendChild(el("div", "moretop", "↑ листай вверх — ещё контекст"));
+  for (let id = S.view.lo; id <= S.view.hi; id++) if (byId.has(id)) body.appendChild(segRow(id, byId.get(id), it, focusSet, m));
+  if (!whole && S.view.hi < maxId) body.appendChild(el("div", "morebot", "↓ листай вниз — ещё контекст"));
   if (fresh) { const f = $("#traceBody .focus"); if (f && f.scrollIntoView) f.scrollIntoView({ block: "center" }); }
 }
 
 function extendUp(it) {
-  const segs = segSource(it), byId = new Map(segs.map(s => [s.seg_id, s.text]));
+  const segs = segSource(it), byId = new Map(segs.map(s => [s.seg_id, s.text])), m = traceMap(it);
   const focusSet = new Set(it.segs || [it.seg_id]); const body = $("#traceBody");
   const newLo = Math.max(S.view.minId, S.view.lo - CHUNK); if (newLo >= S.view.lo) return;
   const before = body.scrollHeight, top = $("#traceBody .moretop");
   const frag = document.createDocumentFragment();
-  for (let id = newLo; id < S.view.lo; id++) if (byId.has(id)) frag.appendChild(segRow(id, byId.get(id), it, focusSet));
+  for (let id = newLo; id < S.view.lo; id++) if (byId.has(id)) frag.appendChild(segRow(id, byId.get(id), it, focusSet, m));
   body.insertBefore(frag, top ? top.nextSibling : body.firstChild);
   S.view.lo = newLo;
   if (top && newLo <= S.view.minId) top.remove();
   body.scrollTop += body.scrollHeight - before;
 }
 function extendDown(it) {
-  const segs = segSource(it), byId = new Map(segs.map(s => [s.seg_id, s.text]));
+  const segs = segSource(it), byId = new Map(segs.map(s => [s.seg_id, s.text])), m = traceMap(it);
   const focusSet = new Set(it.segs || [it.seg_id]); const body = $("#traceBody");
   const newHi = Math.min(S.view.maxId, S.view.hi + CHUNK); if (newHi <= S.view.hi) return;
   const bot = $("#traceBody .morebot"); const frag = document.createDocumentFragment();
-  for (let id = S.view.hi + 1; id <= newHi; id++) if (byId.has(id)) frag.appendChild(segRow(id, byId.get(id), it, focusSet));
+  for (let id = S.view.hi + 1; id <= newHi; id++) if (byId.has(id)) frag.appendChild(segRow(id, byId.get(id), it, focusSet, m));
   body.insertBefore(frag, bot);
   S.view.hi = newHi;
   if (bot && newHi >= S.view.maxId) bot.remove();
@@ -354,6 +409,7 @@ function bind() {
   $("#nextBtn").onclick = () => go(1);
   $("#toFocus").onclick = () => renderItem();
   $("#ctxRadius").onchange = () => renderItem();
+  $("#wholeBtn").onclick = () => { S.wholeTrace = !S.wholeTrace; $("#wholeBtn").classList.toggle("on", S.wholeTrace); renderItem(); };
   $("#traceBody").addEventListener("scroll", () => { if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   ["textSearch", "fSlice", "fBench", "fPrio", "fType", "fMine", "fAgent"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
   document.addEventListener("keydown", ev => {
@@ -373,6 +429,7 @@ function go(d) { if (!S.filtered.length) return; S.idx = (S.idx + d + S.filtered
   bind(); loadMyAnnot();
   const cfgTxt = await tryFetch("config.json");
   S.cfg = cfgTxt ? JSON.parse(cfgTxt) : { event_types: "data/event_types.json", conflicts: "data/conflicts.json", traces_dir: "data/traces" };
+  const mm = await tryFetch(S.cfg.trace_maps_meta || "data/trace_maps_meta.json"); if (mm) try { S.mapMeta = JSON.parse(mm); } catch {}
   const m = await tryFetch(S.cfg.event_types); if (m) try { setModel(JSON.parse(m)); } catch (e) { toast("event_types: " + e.message); }
   const d = await tryFetch(S.cfg.conflicts); if (d) try { setData(JSON.parse(d)); } catch (e) { toast("conflicts: " + e.message); }
   if (!d) toast("не удалось загрузить conflicts.json");

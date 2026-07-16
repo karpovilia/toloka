@@ -1,0 +1,21 @@
+{
+ "hawkes": {
+  "mu": 0.13843167190047345,
+  "alpha": 0.415979735744501,
+  "beta": 0.5755133852550014,
+  "loglik": -54632.77522205232,
+  "axis": "seg_id",
+  "kernel": "alpha*beta*exp(-beta*dt)"
+ },
+ "lam_max": 1.359,
+ "operators": [
+  "CONCLUDING",
+  "DERIVING",
+  "EXPLORING",
+  "REVISING",
+  "SETUP",
+  "VERIFYING"
+ ],
+ "n_traces": 584,
+ "note": "λ измерена: univariate Hawkes MLE на пуле union-событий всех агентов; развилки = типы branch/backtrack/failed_attempt"
+}
