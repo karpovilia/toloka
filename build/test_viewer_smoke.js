@@ -55,6 +55,11 @@ setTimeout(() => {
   // 2) кандидаты + инлайн-чипы (3)
   ok($$("#traceBody .ev").length === 3, "инлайн-события: " + $$("#traceBody .ev").length);
   ok($("#curEvent .ce-pos").textContent.includes("1 / 3"), "текущее событие 1/3: " + $("#curEvent .ce-pos").textContent);
+  // клик по гуттеру -> попап показывает операторный спан точки
+  const gut = $('#traceBody .seg[data-seg-id="3"] .gutter');
+  if (gut) gut.dispatchEvent(new window.MouseEvent("click", { bubbles: true, clientX: 80, clientY: 80 }));
+  const opchip = $("#drillpop .opchip");
+  ok(opchip && opchip.textContent === "DERIVING", "клик по карте показал спан: " + (opchip ? opchip.textContent : "нет"));
   // 3) подтверждаем первое (клавиша 1) -> вердикт ✓ записан, прогресс
   key("1");
   const a1 = JSON.parse(store.getItem("tv_annot::ki") || "{}");
