@@ -72,6 +72,7 @@
       <span class="ctxhint">окно ±</span>
       <input type="number" id="ctxRadius" value="12" min="0" max="80" step="1">
       <button class="btn small" id="wholeBtn" title="вся трасса целиком">вся трасса</button>
+      <button class="btn small" id="treeBtn" title="дерево событий/спанов всей трассы (клавиша t)">🌳 дерево</button>
       <div class="maplegend" id="mapLegend">
         <span class="mlt">спаны:</span>
         <span class="mlop" style="background:#6e56cf" title="постановка: переформулировка задачи, план, декомпозиция">SETUP</span><span class="mlop" style="background:#4c8dff" title="деривация: ровная прямая выкладка/вычисление без реверсов">DERIVING</span><span class="mlop" style="background:#f76b15" title="разбор альтернатив/случаев/веток">EXPLORING</span><span class="mlop" style="background:#12a594" title="устойчивая проверка/пересчёт уже полученного">VERIFYING</span><span class="mlop" style="background:#e5484d" title="восстановление после тупика/реверса — отмена и переделка">REVISING</span><span class="mlop" style="background:#46a758" title="финализация и фиксация ответа">CONCLUDING</span><span class="mlop" style="background:#8e4ec6" title="работа с извлечёнными источниками (RAG)">GROUNDING</span>
@@ -89,6 +90,7 @@
 </div>
 
 <div id="toast" class="hidden"></div>
+<script src="vendor/d3.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

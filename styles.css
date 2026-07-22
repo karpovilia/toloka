@@ -232,3 +232,20 @@ mark{border-radius:3px;padding:0 1px}
 .sl-ev{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;
   display:flex;flex-direction:column;gap:6px}
 .sl-ev.done{border-color:var(--good)}
+
+/* попап-дерево трассы (d3) */
+.treemodal{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.62);display:flex;
+  align-items:center;justify-content:center;padding:24px}
+.treewin{background:var(--panel);border:1px solid var(--line2);border-radius:12px;
+  max-width:min(1240px,95vw);max-height:90vh;min-width:520px;display:flex;flex-direction:column;
+  box-shadow:0 20px 60px rgba(0,0,0,.6)}
+.treehead{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.treetitle{font-weight:700;white-space:nowrap}
+.treelegend{color:var(--muted);font-size:11px;flex:1;line-height:1.4}
+.treex{margin-left:auto;background:var(--panel2);border:1px solid var(--line2);border-radius:6px;
+  width:26px;height:26px;cursor:pointer;flex-shrink:0}
+.treex:hover{border-color:var(--accent)}
+.treescroll{overflow:auto;padding:12px}
+.treemodal text{font:12px/1 -apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif}
+.treemodal .tnode:hover circle,.treemodal .tnode:hover rect{stroke:#fff}
+.treemodal .tnode:hover text{fill:#fff}

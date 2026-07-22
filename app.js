@@ -432,6 +432,97 @@ function drill(seg, evt) {
   pop.style.left = Math.max(6, x) + "px"; pop.style.top = Math.max(6, y) + "px";
 }
 
+/* ---------- дерево всей трассы (d3) ---------- */
+// иерархия: корень(трасса) -> операторные спаны -> события-кандидаты в спане
+function buildTreeData() {
+  const tr = S.trace; if (!tr) return null;
+  const m = traceMap();
+  const lamAt = (s) => (m && m.lam.length > s ? m.lam[s] : 0);
+  const mkEvent = (ci) => {
+    const c = S.cands[ci], v = vget(candId(S.curTF, c));
+    return { kind: "event", ci, seg: c.seg, type: c.type, agents: c.agents, fork: isFork(c.type), verdict: v || null };
+  };
+  const spans = (tr.spans || []).slice().sort((a, b) => a.a - b.a);
+  const used = new Set(), spanNodes = [];
+  for (const sp of spans) {
+    const kids = [];
+    S.cands.forEach((c, i) => { if (!used.has(i) && c.seg >= sp.a && c.seg < sp.b) { kids.push(mkEvent(i)); used.add(i); } });
+    let sum = 0, n = 0; for (let s = sp.a; s < sp.b; s++) { sum += lamAt(s); n++; }
+    spanNodes.push({ kind: "span", op: sp.op, a: sp.a, b: sp.b, seg: sp.a, lam: n ? sum / n : 0, children: kids });
+  }
+  const orphans = []; S.cands.forEach((c, i) => { if (!used.has(i)) orphans.push(mkEvent(i)); });
+  if (orphans.length) spanNodes.push({ kind: "span", op: null, a: null, b: null, seg: orphans[0].seg, lam: 0, children: orphans.sort((a, b) => a.seg - b.seg) });
+  const idx = S.index.find(x => x.trace_file === S.curTF);
+  return { kind: "root", name: idx ? `${idx.benchmark} · ${idx.model} · ${idx.question_id}` : (S.curTF || "трасса"), children: spanNodes };
+}
+function nodeLabel(nd) {
+  if (nd.kind === "root") return nd.name;
+  if (nd.kind === "span") return (nd.op || "вне спанов") + (nd.a != null ? ` ${nd.a}–${nd.b - 1}` : "") + (nd.lam ? `  λ${nd.lam.toFixed(2)}` : "");
+  const ag = nd.agents.map(a => AGENT_LABEL[a] || a).join("/");
+  const vv = nd.verdict === CONFIRM ? " ✓" : nd.verdict === REJECT ? " ✗" : nd.verdict ? " →" + nd.verdict : "";
+  return `${(nd.fork ? FORK[nd.type] + " " : "")}${nd.type} · s${nd.seg} · ${ag}${vv}`;
+}
+function nodeTitle(nd) {
+  if (nd.kind === "span") return nd.op ? opTitle(nd.op) : "события вне операторных спанов";
+  if (nd.kind === "event") return typeTitle(nd.type) + " · нашли: " + nd.agents.map(a => AGENT_LABEL[a] || a).join(", ") + (nd.verdict ? " · вердикт " + verdictLabel(nd.verdict) : "");
+  return nd.name;
+}
+function treeEsc(e) { if (e.key === "Escape") closeTree(); }
+function closeTree() { const o = $("#treeModal"); if (o) o.remove(); document.removeEventListener("keydown", treeEsc); }
+function openTree() {
+  closeTree(); closeDrill();
+  if (typeof d3 === "undefined") { toast("d3 не загрузился (vendor/d3.min.js)"); return; }
+  const data = buildTreeData();
+  if (!data || !data.children.length) { toast("на трассе нет спанов/событий"); return; }
+  const overlay = el("div", "treemodal"); overlay.id = "treeModal";
+  overlay.onclick = (e) => { if (e.target === overlay) closeTree(); };
+  const win = el("div", "treewin");
+  const head = el("div", "treehead");
+  head.appendChild(el("div", "treetitle", "🌳 " + data.name));
+  const leg = el("div", "treelegend");
+  leg.innerHTML = "спаны — цвет оператора · события — цвет типа · ◇◄✗ форки · кольцо: <b style='color:#30a46c'>✓</b>/<b style='color:#e5484d'>✗</b>/<b style='color:#4c8dff'>тип</b> · клик по узлу — перейти к строке";
+  head.appendChild(leg);
+  const x = el("button", "treex", "✕"); x.title = "закрыть (Esc)"; x.onclick = closeTree; head.appendChild(x);
+  win.appendChild(head);
+  const scroll = el("div", "treescroll"); win.appendChild(scroll);
+  overlay.appendChild(win); document.body.appendChild(overlay);
+  document.addEventListener("keydown", treeEsc);
+
+  const root = d3.hierarchy(data);
+  const rowH = 22, colW = 230;
+  d3.tree().nodeSize([rowH, colW]).separation((a, b) => a.parent === b.parent ? 1 : 1.4)(root);
+  let minX = Infinity, maxX = -Infinity, maxY = 0;
+  root.each(d => { if (d.x < minX) minX = d.x; if (d.x > maxX) maxX = d.x; if (d.y > maxY) maxY = d.y; });
+  const W = maxY + colW + 200, H = (maxX - minX) + rowH * 3;
+  const svg = d3.select(scroll).append("svg").attr("width", W).attr("height", H);
+  const g = svg.append("g").attr("transform", `translate(120,${-minX + rowH})`);
+  g.append("g").attr("fill", "none").attr("stroke", "#2f3644").attr("stroke-width", 1.2)
+    .selectAll("path").data(root.links()).join("path")
+    .attr("d", d3.linkHorizontal().x(d => d.y).y(d => d.x));
+  const node = g.append("g").selectAll("g").data(root.descendants()).join("g")
+    .attr("class", d => "tnode tnode-" + d.data.kind)
+    .attr("transform", d => `translate(${d.y},${d.x})`)
+    .style("cursor", d => d.data.kind === "root" ? "default" : "pointer")
+    .on("click", (e, d) => { if (d.data.kind === "root") return; closeTree(); selectSeg(d.data.seg, true); });
+  node.each(function (d) {
+    const sel = d3.select(this), nd = d.data;
+    if (nd.kind === "span") {
+      const c = nd.op ? (OP_COLOR[nd.op] || "#555") : "#3a4152";
+      sel.append("rect").attr("x", -7).attr("y", -8).attr("width", 14).attr("height", 16).attr("rx", 4)
+        .attr("fill", c).attr("stroke", "#0b0d12").attr("stroke-width", 1);
+    } else if (nd.kind === "event") {
+      const c = typeColor(nd.type);
+      const vc = nd.verdict === CONFIRM ? "#30a46c" : nd.verdict === REJECT ? "#e5484d" : nd.verdict ? "#4c8dff" : "#0b0d12";
+      sel.append("circle").attr("r", 6).attr("fill", c).attr("stroke", vc).attr("stroke-width", nd.verdict ? 2.6 : 1.2);
+      if (nd.fork) sel.append("text").attr("text-anchor", "middle").attr("dy", "0.32em").attr("font-size", "9px").attr("fill", contrast(c)).attr("pointer-events", "none").text(FORK[nd.type]);
+    } else {
+      sel.append("circle").attr("r", 5).attr("fill", "#8b93a5").attr("stroke", "#0b0d12");
+    }
+    sel.append("text").attr("x", 12).attr("dy", "0.32em").attr("fill", "#e6e9ef").text(nodeLabel(nd));
+    sel.append("title").text(nodeTitle(nd));
+  });
+}
+
 /* ---------- deep-link / share ---------- */
 function parseHash() { const p = {}; for (const kv of location.hash.replace(/^#/, "").split("&")) { const i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } return p; }
 function updateHash() {
@@ -496,6 +587,7 @@ function bind() {
   $("#nextEv").onclick = () => gotoEvent(1);
   $("#wholeBtn").onclick = () => { S.wholeTrace = !S.wholeTrace; $("#wholeBtn").classList.toggle("on", S.wholeTrace); renderTrace(true); };
   $("#wholeBtn").classList.toggle("on", S.wholeTrace);
+  $("#treeBtn").onclick = openTree;
   $("#ctxRadius").onchange = () => renderTrace(true);
   $("#traceBody").addEventListener("scroll", () => { closeDrill(); if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   document.addEventListener("click", closeDrill);
@@ -506,6 +598,7 @@ function bind() {
     if (ev.key === "]") return selTrace(1);
     if (ev.key === "j" || ev.key === "n" || ev.key === "ArrowDown") return gotoEvent(1);
     if (ev.key === "k" || ev.key === "p" || ev.key === "ArrowUp") return gotoEvent(-1);
+    if (ev.key === "t") return openTree();
     // 1/2 — вердикт первому событию на выбранной строке
     const cb = S.candBySeg.get(S.selSeg); const c = cb && cb.length ? S.cands[cb[0]] : null;
     if (ev.key === "1" && c) setVerdict(c, CONFIRM);

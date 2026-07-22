@@ -44,6 +44,7 @@ window.btoa = s => Buffer.from(s, "binary").toString("base64");
 const store = window.localStorage;
 try { window.URL.createObjectURL = () => "blob:x"; window.URL.revokeObjectURL = () => {}; } catch {}
 let lastExport = null; window.HTMLAnchorElement.prototype.click = function () { lastExport = this.download; };
+window.eval(fs.readFileSync(path.join(DIR, "vendor/d3.min.js"), "utf8"));   // настоящий d3 для дерева
 window.eval(appjs);
 const $ = s => window.document.querySelector(s), $$ = s => [...window.document.querySelectorAll(s)];
 const key = k => window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: k, bubbles: true }));
@@ -71,6 +72,15 @@ setTimeout(() => {
   if (sid5) sid5.dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
   ok(window.location.hash.includes("seg=5"), "ссылка на строку: hash = " + window.location.hash);
   ok($('#traceBody .seg[data-seg-id="5"]').classList.contains("linked"), "строка 5 подсвечена linked");
+  // дерево трассы (d3-попап): открытие, узлы root+2 спана+3 события, закрытие
+  ok($("#treeBtn"), "кнопка дерева есть");
+  $("#treeBtn").click();
+  ok($("#treeModal svg"), "дерево-попап открылся (svg)");
+  ok($$("#treeModal .tnode").length === 6, "узлов дерева = root+2спана+3события: " + $$("#treeModal .tnode").length);
+  ok($$("#treeModal .tnode-span").length === 2, "спан-узлов: " + $$("#treeModal .tnode-span").length);
+  ok($$("#treeModal .tnode-event").length === 3, "событий-узлов: " + $$("#treeModal .tnode-event").length);
+  $("#treeModal .treex").click();
+  ok(!$("#treeModal"), "дерево закрылось по ✕");
   // сворачивание левого списка
   $("#listToggle").click();
   ok($("#main").classList.contains("nolist"), "левый список свёрнут");
