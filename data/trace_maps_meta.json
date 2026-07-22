@@ -1,54 +1,97 @@
 {
  "hawkes_by_type": {
   "backtrack": {
-   "mu": 0.0835,
-   "alpha": 0.4893,
-   "beta": 1.5254,
-   "n_seqs": 506
-  },
-  "subgoal_done": {
-   "mu": 0.0315,
-   "alpha": 0.4887,
-   "beta": 1.5217,
-   "n_seqs": 536
-  },
-  "branch": {
-   "mu": 0.0204,
-   "alpha": 0.4885,
-   "beta": 1.5211,
-   "n_seqs": 423
-  },
-  "commit": {
-   "mu": 0.0055,
-   "alpha": 0.8569,
-   "beta": 0.1637,
-   "n_seqs": 509
-  },
-  "failed_attempt": {
-   "mu": 0.0155,
-   "alpha": 0.2261,
-   "beta": 0.2304,
-   "n_seqs": 367
+   "mu": 0.0694,
+   "alpha": 0.2101,
+   "beta": 1.8453,
+   "n_seqs": 592
   },
   "verify": {
-   "mu": 0.044,
+   "mu": 0.0505,
+   "alpha": 0.489,
+   "beta": 1.5253,
+   "n_seqs": 635
+  },
+  "failed_attempt": {
+   "mu": 0.0146,
+   "alpha": 0.4883,
+   "beta": 1.525,
+   "n_seqs": 244
+  },
+  "subgoal_done": {
+   "mu": 0.0419,
+   "alpha": 0.4889,
+   "beta": 1.5251,
+   "n_seqs": 492
+  },
+  "commit": {
+   "mu": 0.0067,
+   "alpha": 0.98,
+   "beta": 0.05,
+   "n_seqs": 600
+  },
+  "branch": {
+   "mu": 0.0195,
+   "alpha": 0.4885,
+   "beta": 1.521,
+   "n_seqs": 356
+  },
+  "decomposition": {
+   "mu": 0.0143,
+   "alpha": 0.4185,
+   "beta": 0.7032,
+   "n_seqs": 148
+  },
+  "evidence_merge": {
+   "mu": 0.0442,
    "alpha": 0.4889,
    "beta": 1.5254,
-   "n_seqs": 525
+   "n_seqs": 161
+  },
+  "internal_use": {
+   "mu": 0.0719,
+   "alpha": 0.6921,
+   "beta": 0.1139,
+   "n_seqs": 148
+  },
+  "query_rewrite": {
+   "mu": 0.03,
+   "alpha": 0.8687,
+   "beta": 0.05,
+   "n_seqs": 135
+  },
+  "retrieval_call": {
+   "mu": 0.0236,
+   "alpha": 0.8617,
+   "beta": 0.05,
+   "n_seqs": 152
+  },
+  "contradiction": {
+   "mu": 0.0079,
+   "alpha": 0.2414,
+   "beta": 0.632,
+   "n_seqs": 62
+  },
+  "retrieval_inadequate": {
+   "mu": 0.0251,
+   "alpha": 0.4886,
+   "beta": 1.5254,
+   "n_seqs": 97
   }
  },
- "floor": 0.2004,
+ "floor": 0.4196,
  "axis": "seg_id",
  "kernel": "alpha*beta*exp(-beta*dt)",
- "lam_max": 1.162,
+ "lam_max": 2.045,
  "operators": [
   "CONCLUDING",
   "DERIVING",
   "EXPLORING",
+  "GROUNDING",
   "REVISING",
   "SETUP",
   "VERIFYING"
  ],
- "n_traces": 584,
+ "n_traces": 679,
  "note": "пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях всех агентов; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt"
 }
