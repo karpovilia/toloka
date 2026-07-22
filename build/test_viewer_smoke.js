@@ -79,6 +79,10 @@ setTimeout(() => {
   ok($$("#treeModal .tnode").length === 6, "узлов дерева = root+2спана+3события: " + $$("#treeModal .tnode").length);
   ok($$("#treeModal .tnode-span").length === 2, "спан-узлов: " + $$("#treeModal .tnode-span").length);
   ok($$("#treeModal .tnode-event").length === 3, "событий-узлов: " + $$("#treeModal .tnode-event").length);
+  // провенанс: commit (наш тип) — квадрат, backtrack/verify (ReasonOps-аналог) — круги
+  ok($$("#treeModal .tnode-event rect").length === 1, "наш тип в дереве = квадрат: " + $$("#treeModal .tnode-event rect").length);
+  ok($$("#treeModal .tnode-event circle").length === 2, "ReasonOps-аналоги в дереве = круги: " + $$("#treeModal .tnode-event circle").length);
+  ok($(".maplegend .mlex.ours") && $(".maplegend .mlex.ro"), "легенда провенанса типов в ctxbar");
   $("#treeModal .treex").click();
   ok(!$("#treeModal"), "дерево закрылось по ✕");
   // сворачивание левого списка

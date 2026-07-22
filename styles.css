@@ -76,6 +76,9 @@ button,input,select,textarea{font:inherit;color:inherit}
 .btn.small.on{background:var(--accent2);border-color:var(--accent2);color:#fff}
 .seg.cursor{outline:2px solid var(--warn);outline-offset:-1px}
 .maplegend .mlbar{display:inline-block;width:14px;height:6px;background:#e5484d;border-radius:2px;vertical-align:middle}
+.maplegend .mlex{font-size:9px;padding:0 6px;background:var(--panel2);color:var(--fg);margin-right:5px}
+.maplegend .mlex.ro{border-radius:10px}
+.maplegend .mlex.ours{border-radius:2px;outline:1.5px dashed currentColor;outline-offset:1px}
 /* drill-down попап: распределение λ по типам */
 .drillpop{position:fixed;z-index:30;min-width:210px;max-width:250px;background:var(--panel);
   border:1px solid var(--line2);border-radius:8px;padding:8px;box-shadow:0 10px 30px rgba(0,0,0,.55)}

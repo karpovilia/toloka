@@ -84,9 +84,13 @@ function setIndex(raw) {
   if (!Array.isArray(raw) || !raw.length) { toast("traces_index.json: пусто"); return; }
   S.index = raw;
   fillSelect("#fBench", uniq(raw.map(x => x.benchmark)), "все бенчи");
+  const SLICE_NAME = { C: "Claude", D: "DeepSeek", Q: "Qwen" };
+  const fsl = $("#fSlice"); fsl.innerHTML = '<option value="">все срезы</option>';
+  for (const s of uniq(raw.map(x => x.slice))) { const o = el("option", null, `${s} · regex+${[...s].map(c => SLICE_NAME[c] || c).join("+")}`); o.value = s; fsl.appendChild(o); }
   const agents = uniq(raw.flatMap(x => x.agents || []));
   const fa = $("#fAgent"); fa.innerHTML = '<option value="">любой агент</option>';
   for (const a of agents) { const o = el("option", null, AGENT_LABEL[a] || a); o.value = a; fa.appendChild(o); }
+  fillSelect("#fType", uniq(raw.flatMap(x => x.types || [])), "все типы событий");
   applyFilters();
 }
 function uniq(a) { return [...new Set(a.filter(Boolean))].sort(); }
@@ -126,12 +130,13 @@ function verifiedCount(tf) { let n = 0; const p = tracePrefix(tf); for (const k 
 /* ---------- filters + trace list ---------- */
 function applyFilters() {
   const q = $("#textSearch").value.trim().toLowerCase();
-  const fb = $("#fBench").value, fs = $("#fSlice").value, fa = $("#fAgent").value, fm = $("#fMine").value;
+  const fb = $("#fBench").value, fs = $("#fSlice").value, fa = $("#fAgent").value, fm = $("#fMine").value, fty = $("#fType").value;
   S.filtered = [];
   S.index.forEach((tr, i) => {
     if (fb && tr.benchmark !== fb) return;
     if (fs && tr.slice !== fs) return;
     if (fa && !(tr.agents || []).includes(fa)) return;
+    if (fty && !(tr.types || []).includes(fty)) return;
     const done = verifiedCount(tr.trace_file), total = tr.n_candidates;
     if (fm === "untouched" && done > 0) return;
     if (fm === "done" && done < total) return;
@@ -480,7 +485,7 @@ function openTree() {
   const head = el("div", "treehead");
   head.appendChild(el("div", "treetitle", "🌳 " + data.name));
   const leg = el("div", "treelegend");
-  leg.innerHTML = "спаны — цвет оператора · события — цвет типа · ◇◄✗ форки · кольцо: <b style='color:#30a46c'>✓</b>/<b style='color:#e5484d'>✗</b>/<b style='color:#4c8dff'>тип</b> · клик по узлу — перейти к строке";
+  leg.innerHTML = "спаны — цвет оператора · события: ● тип с ReasonOps-аналогом, ▧ наш тип · ◇◄✗ форки · кольцо: <b style='color:#30a46c'>✓</b>/<b style='color:#e5484d'>✗</b>/<b style='color:#4c8dff'>тип</b> · клик по узлу — перейти к строке";
   head.appendChild(leg);
   const x = el("button", "treex", "✕"); x.title = "закрыть (Esc)"; x.onclick = closeTree; head.appendChild(x);
   win.appendChild(head);
@@ -513,7 +518,12 @@ function openTree() {
     } else if (nd.kind === "event") {
       const c = typeColor(nd.type);
       const vc = nd.verdict === CONFIRM ? "#30a46c" : nd.verdict === REJECT ? "#e5484d" : nd.verdict ? "#4c8dff" : "#0b0d12";
-      sel.append("circle").attr("r", 6).attr("fill", c).attr("stroke", vc).attr("stroke-width", nd.verdict ? 2.6 : 1.2);
+      // провенанс: круг = тип с ReasonOps-аналогом, пунктирный квадрат = чисто наш тип
+      const shape = isReasonOps(nd.type)
+        ? sel.append("circle").attr("r", 6)
+        : sel.append("rect").attr("x", -6).attr("y", -6).attr("width", 12).attr("height", 12).attr("stroke-dasharray", nd.verdict ? null : "2,2");
+      shape.attr("fill", c).attr("stroke", vc).attr("stroke-width", nd.verdict ? 2.6 : 1.2);
+      if (!nd.verdict && !isReasonOps(nd.type)) shape.attr("stroke", "#8b93a5");
       if (nd.fork) sel.append("text").attr("text-anchor", "middle").attr("dy", "0.32em").attr("font-size", "9px").attr("fill", contrast(c)).attr("pointer-events", "none").text(FORK[nd.type]);
     } else {
       sel.append("circle").attr("r", 5).attr("fill", "#8b93a5").attr("stroke", "#0b0d12");
@@ -591,7 +601,7 @@ function bind() {
   $("#ctxRadius").onchange = () => renderTrace(true);
   $("#traceBody").addEventListener("scroll", () => { closeDrill(); if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   document.addEventListener("click", closeDrill);
-  ["textSearch", "fBench", "fSlice", "fAgent", "fMine"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
+  ["textSearch", "fBench", "fSlice", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
   document.addEventListener("keydown", ev => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     if (ev.key === "[") return selTrace(-1);
