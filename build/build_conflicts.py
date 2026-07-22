@@ -230,13 +230,25 @@ def main():
         short = {v: k for k, v in MODEL_FULL.items()}.get(m.get("trace_model"), "gptoss")
         Kq[(short, m.get("benchmark"), dq["question_id"])] = f
 
-    slice_a = sorted(set(Kc) & set(Kd))                 # regex+claude+deepseek
-    slice_b = sorted(Kq)                                # regex+qwen
-    targets = [("A", k, {"claude": Kc[k], "deepseek": Kd[k]}) for k in slice_a] + \
-              [("B", k, {"qwen": Kq[k]}) for k in slice_b]
+    # Срез = множество LLM-агентов, реально разметивших трассу (C=Claude, D=DeepSeek, Q=Qwen);
+    # regex есть везде. После полного Qwen-прогона корпуса (2026-07) 4-way (CDQ) непуст.
+    INITIAL = {"claude": "C", "deepseek": "D", "qwen": "Q"}
+    lab_by_key = {}
+    for k in set(Kc) | set(Kd) | set(Kq):
+        d = {}
+        if k in Kc:
+            d["claude"] = Kc[k]
+        if k in Kd:
+            d["deepseek"] = Kd[k]
+        if k in Kq:
+            d["qwen"] = Kq[k]
+        lab_by_key[k] = d
+    targets = [("".join(sorted(INITIAL[a] for a in d)), k, d)
+               for k, d in sorted(lab_by_key.items())]
     if args.limit:
         targets = targets[:args.limit]
-    print(f"трасс к обработке: {len(targets)}  (slice A={len(slice_a)}, slice B={len(slice_b)})")
+    slice_traces = Counter(sl for sl, _, _ in targets)
+    print(f"трасс к обработке: {len(targets)}  срезы: {dict(slice_traces)}")
 
     all_sites = []          # для jsonl
     per_agent_totals = Counter()
@@ -307,14 +319,42 @@ def main():
     buckets = defaultdict(list)   # (slice, prio) -> [sites]
     for s in all_sites:
         buckets[(s["slice"], s["priority"])].append(s)
-    for k in buckets:
-        buckets[k].sort(key=lambda s: (s["cell"], s["question_id"], s["seg_id"]))
 
-    quota = {"A": int(args.cap * 0.70), "B": args.cap - int(args.cap * 0.70)}
+    def interleave_by_cell(sites):
+        """Round-robin по cell: иначе кап срезает хвост алфавита (musique, qwen-модели)."""
+        by_cell = defaultdict(list)
+        for s in sites:
+            by_cell[s["cell"]].append(s)
+        for c in by_cell:
+            by_cell[c].sort(key=lambda s: (s["question_id"], s["seg_id"]))
+        out, cells = [], sorted(by_cell)
+        while len(out) < len(sites):
+            for c in cells:
+                if by_cell[c]:
+                    out.append(by_cell[c].pop(0))
+        return out
+
+    for k in buckets:
+        buckets[k] = interleave_by_cell(buckets[k])
+
+    # Квота среза: пол MIN_SLICE каждому (чтобы скорить всех агентов), остаток — пропорционально
+    # числу LLM-vs-LLM конфликтов (prio>=3): срезы с одним LLM (Q, D) дают только шумные prio1/2
+    # и не должны съедать вьюер объёмом.
+    slice_sites = Counter(s["slice"] for s in all_sites)
+    slice_hi = Counter(s["slice"] for s in all_sites if s["priority"] >= 3)
+    slices = sorted(slice_sites)
+    MIN_SLICE = 300
+    quota = {sl: min(MIN_SLICE, slice_sites[sl]) for sl in slices}
+    rest = args.cap - sum(quota.values())
+    if rest > 0:
+        weight = {sl: slice_hi[sl] for sl in slices}
+        wsum = sum(weight.values()) or 1
+        for sl in slices:
+            quota[sl] += int(rest * weight[sl] / wsum)
     frac = {4: 0.45, 3: 0.30, 2: 0.10, 1: 0.15}  # чтобы адъюдицировались ВСЕ режимы ошибок
     top = []
-    for sl in ("A", "B"):
-        cap_sl = quota[sl]
+    for sl in slices:
+        cap_sl = min(quota[sl], slice_sites[sl])
         used = set()
         # первый проход — по целевым долям тиров
         for prio in (4, 3, 2, 1):
@@ -372,8 +412,9 @@ def main():
         "sites_in_viewer": len(top),
         "by_priority": dict(kind_counter),
         "per_agent_site_participation": dict(per_agent_totals),
-        "slices": {"A_regex_claude_deepseek": len(slice_a), "B_regex_qwen": len(slice_b)},
-        "note": "4-way на общих трассах отсутствует; см. README",
+        "slices_traces": dict(slice_traces),
+        "slices_sites_selected": dict(Counter(s["slice"] for s in top)),
+        "note": "срез = множество LLM-агентов трассы (C=Claude, D=DeepSeek, Q=Qwen; regex везде); 4-way CDQ непуст после полного Qwen-прогона корпуса",
     }
     json.dump(summary, open(os.path.join(outdata, "build_summary.json"), "w"), ensure_ascii=False, indent=1)
     print("сайтов всего:", len(all_sites), "| во вьюере:", len(top))

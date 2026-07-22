@@ -1,22 +1,32 @@
 {
- "traces_processed": 2162,
- "sites_total": 196247,
- "sites_in_viewer": 6000,
+ "traces_processed": 7075,
+ "sites_total": 319073,
+ "sites_in_viewer": 5998,
  "by_priority": {
-  "prio3": 66382,
-  "prio2": 4447,
-  "prio1": 113910,
-  "prio4": 11508
+  "prio2": 21900,
+  "prio1": 203164,
+  "prio3": 75703,
+  "prio4": 18306
  },
  "per_agent_site_participation": {
-  "regex": 196247,
-  "claude": 188019,
-  "deepseek": 188019,
-  "qwen": 8228
+  "regex": 319073,
+  "deepseek": 224362,
+  "claude": 193628,
+  "qwen": 189978
  },
- "slices": {
-  "A_regex_claude_deepseek": 1693,
-  "B_regex_qwen": 485
+ "slices_traces": {
+  "D": 1612,
+  "CDQ": 916,
+  "CD": 882,
+  "DQ": 1059,
+  "Q": 3347
  },
- "note": "4-way на общих трассах отсутствует; см. README"
+ "slices_sites_selected": {
+  "CD": 2545,
+  "CDQ": 2230,
+  "DQ": 623,
+  "D": 300,
+  "Q": 300
+ },
+ "note": "срез = множество LLM-агентов трассы (C=Claude, D=DeepSeek, Q=Qwen; regex везде); 4-way CDQ непуст после полного Qwen-прогона корпуса"
 }

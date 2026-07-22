@@ -53,6 +53,7 @@ def main():
             "slice": slice_of.get(tf), "n_segments": len(d.get("segments", [])),
             "n_events": len(d.get("events", [])), "n_candidates": len(cands),
             "agents": d.get("agents", []),
+            "types": sorted({c["type"] for c in cands}),
         })
     idx.sort(key=lambda r: (r["benchmark"] or "", r["cell"] or "", r["question_id"] or ""))
     json.dump(idx, open(os.path.join(DATA, "traces_index.json"), "w"), ensure_ascii=False)
