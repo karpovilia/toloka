@@ -44,14 +44,13 @@
       <input type="search" id="textSearch" placeholder="поиск: qid / model">
       <div class="frow">
         <select id="fBench"><option value="">все бенчи</option></select>
-        <select id="fSlice">
-          <option value="">все срезы</option>
-          <option value="A">A · regex+Claude+DeepSeek</option>
-          <option value="B">B · regex+Qwen</option>
-        </select>
+        <select id="fSlice"><option value="">все срезы</option></select>
       </div>
       <div class="frow">
         <select id="fAgent"><option value="">любой агент</option></select>
+        <select id="fType"><option value="">все типы событий</option></select>
+      </div>
+      <div class="frow">
         <select id="fMine">
           <option value="">все трассы</option>
           <option value="unfinished">не дозавершённые</option>
@@ -77,6 +76,7 @@
         <span class="mlt">спаны:</span>
         <span class="mlop" style="background:#6e56cf" title="постановка: переформулировка задачи, план, декомпозиция">SETUP</span><span class="mlop" style="background:#4c8dff" title="деривация: ровная прямая выкладка/вычисление без реверсов">DERIVING</span><span class="mlop" style="background:#f76b15" title="разбор альтернатив/случаев/веток">EXPLORING</span><span class="mlop" style="background:#12a594" title="устойчивая проверка/пересчёт уже полученного">VERIFYING</span><span class="mlop" style="background:#e5484d" title="восстановление после тупика/реверса — отмена и переделка">REVISING</span><span class="mlop" style="background:#46a758" title="финализация и фиксация ответа">CONCLUDING</span><span class="mlop" style="background:#8e4ec6" title="работа с извлечёнными источниками (RAG)">GROUNDING</span>
         <span class="mlsep">·</span><span class="mlt"><span class="mlbar"></span> λ Hawkes · ◇branch ◄backtrack ✗failed •прочее · клик — распределение λ</span>
+        <span class="mlsep">·</span><span class="mlt">типы: <span class="mlex ro" title="у типа есть прямой оператор-аналог в таксономии ReasonOps">ReasonOps-аналог</span> <span class="mlex ours" title="чисто наш тип, аналога в ReasonOps нет">наш тип</span></span>
       </div>
     </div>
     <div id="traceBody"></div>
