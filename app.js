@@ -86,13 +86,12 @@ function setIndex(raw) {
   fillSelect("#fBench", uniq(raw.map(x => x.benchmark)), "все бенчи");
   fillSelect("#fModel", uniq(raw.map(x => x.model)), "все модели");
   const agents = uniq(raw.flatMap(x => x.agents || []));
-  const fa = $("#fAgent"); fa.innerHTML = '<option value="">любой агент</option>';
-  for (const a of agents) { const o = el("option", null, AGENT_LABEL[a] || a); o.value = a; fa.appendChild(o); }
+  const fa = $("#fAgent"); if (fa) { fa.innerHTML = '<option value="">любой агент</option>'; for (const a of agents) { const o = el("option", null, AGENT_LABEL[a] || a); o.value = a; fa.appendChild(o); } }
   fillSelect("#fType", uniq(raw.flatMap(x => x.types || [])), "все типы событий");
   applyFilters();
 }
 function uniq(a) { return [...new Set(a.filter(Boolean))].sort(); }
-function fillSelect(sel, vals, allLabel) { const s = $(sel); s.innerHTML = ""; const o0 = el("option", null, allLabel); o0.value = ""; s.appendChild(o0); for (const v of vals) { const o = el("option", null, v); o.value = v; s.appendChild(o); } }
+function fillSelect(sel, vals, allLabel) { const s = $(sel); if (!s) return; s.innerHTML = ""; const o0 = el("option", null, allLabel); o0.value = ""; s.appendChild(o0); for (const v of vals) { const o = el("option", null, v); o.value = v; s.appendChild(o); } }
 
 async function loadTrace(tf) {
   if (S.traces[tf] === undefined) {
@@ -128,7 +127,8 @@ function verifiedCount(tf) { let n = 0; const p = tracePrefix(tf); for (const k 
 /* ---------- filters + trace list ---------- */
 function applyFilters() {
   const q = $("#textSearch").value.trim().toLowerCase();
-  const fb = $("#fBench").value, fmo = $("#fModel").value, fa = $("#fAgent").value, fm = $("#fMine").value, fty = $("#fType").value;
+  const fval = (id) => { const e = $(id); return e ? e.value : ""; };
+  const fb = fval("#fBench"), fmo = fval("#fModel"), fa = fval("#fAgent"), fm = fval("#fMine"), fty = fval("#fType");
   S.filtered = [];
   S.index.forEach((tr, i) => {
     if (fb && tr.benchmark !== fb) return;
@@ -599,8 +599,8 @@ function bind() {
   $("#ctxRadius").onchange = () => renderTrace(true);
   $("#traceBody").addEventListener("scroll", () => { closeDrill(); if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   document.addEventListener("click", closeDrill);
-  ["textSearch", "fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
-  $("#fReset").onclick = () => { ["fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { $("#" + id).value = ""; }); $("#textSearch").value = ""; applyFilters(); toast("фильтры сброшены"); };
+  ["textSearch", "fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); if (e) e.oninput = e.onchange = applyFilters; });
+  const frst = $("#fReset"); if (frst) frst.onclick = () => { ["fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); if (e) e.value = ""; }); const ts = $("#textSearch"); if (ts) ts.value = ""; applyFilters(); toast("фильтры сброшены"); };
   document.addEventListener("keydown", ev => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     if (ev.key === "[") return selTrace(-1);
