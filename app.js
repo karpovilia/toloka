@@ -84,9 +84,7 @@ function setIndex(raw) {
   if (!Array.isArray(raw) || !raw.length) { toast("traces_index.json: пусто"); return; }
   S.index = raw;
   fillSelect("#fBench", uniq(raw.map(x => x.benchmark)), "все бенчи");
-  const SLICE_NAME = { C: "Claude", D: "DeepSeek", Q: "Qwen" };
-  const fsl = $("#fSlice"); fsl.innerHTML = '<option value="">все срезы</option>';
-  for (const s of uniq(raw.map(x => x.slice))) { const o = el("option", null, `${s} · regex+${[...s].map(c => SLICE_NAME[c] || c).join("+")}`); o.value = s; fsl.appendChild(o); }
+  fillSelect("#fModel", uniq(raw.map(x => x.model)), "все модели");
   const agents = uniq(raw.flatMap(x => x.agents || []));
   const fa = $("#fAgent"); fa.innerHTML = '<option value="">любой агент</option>';
   for (const a of agents) { const o = el("option", null, AGENT_LABEL[a] || a); o.value = a; fa.appendChild(o); }
@@ -130,11 +128,11 @@ function verifiedCount(tf) { let n = 0; const p = tracePrefix(tf); for (const k 
 /* ---------- filters + trace list ---------- */
 function applyFilters() {
   const q = $("#textSearch").value.trim().toLowerCase();
-  const fb = $("#fBench").value, fs = $("#fSlice").value, fa = $("#fAgent").value, fm = $("#fMine").value, fty = $("#fType").value;
+  const fb = $("#fBench").value, fmo = $("#fModel").value, fa = $("#fAgent").value, fm = $("#fMine").value, fty = $("#fType").value;
   S.filtered = [];
   S.index.forEach((tr, i) => {
     if (fb && tr.benchmark !== fb) return;
-    if (fs && tr.slice !== fs) return;
+    if (fmo && tr.model !== fmo) return;
     if (fa && !(tr.agents || []).includes(fa)) return;
     if (fty && !(tr.types || []).includes(fty)) return;
     const done = verifiedCount(tr.trace_file), total = tr.n_candidates;
@@ -189,7 +187,7 @@ async function openTrace(tf, opts = {}) {
   S.linkedSeg = (opts.seg != null && !isNaN(opts.seg)) ? opts.seg : null;
   S.selSeg = (opts.seg != null && !isNaN(opts.seg)) ? opts.seg : (S.cands.length ? S.cands[0].seg : (tr && tr.segments && tr.segments.length ? tr.segments[0].seg_id : 0));
   const idx = S.index.find(x => x.trace_file === tf);
-  $("#qLabel").textContent = idx ? `${idx.benchmark} · ${idx.model} · qid ${idx.question_id} · срез ${idx.slice} · ${idx.n_segments} сегм · ${S.cands.length} событий` : tf;
+  $("#qLabel").textContent = idx ? `${idx.benchmark} · ${idx.model} · qid ${idx.question_id} · разметили: ${(idx.agents || []).map(a => AGENT_LABEL[a] || a).join("+")} · ${idx.n_segments} сегм · ${S.cands.length} событий` : tf;
   renderTrace(true);
   if (S.linkedSeg != null) setHashLine(S.linkedSeg); else updateHash();
 }
@@ -601,7 +599,8 @@ function bind() {
   $("#ctxRadius").onchange = () => renderTrace(true);
   $("#traceBody").addEventListener("scroll", () => { closeDrill(); if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   document.addEventListener("click", closeDrill);
-  ["textSearch", "fBench", "fSlice", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
+  ["textSearch", "fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); e.oninput = e.onchange = applyFilters; });
+  $("#fReset").onclick = () => { ["fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { $("#" + id).value = ""; }); $("#textSearch").value = ""; applyFilters(); toast("фильтры сброшены"); };
   document.addEventListener("keydown", ev => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     if (ev.key === "[") return selTrace(-1);

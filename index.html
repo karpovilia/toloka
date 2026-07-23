@@ -44,19 +44,20 @@
       <input type="search" id="textSearch" placeholder="поиск: qid / model">
       <div class="frow">
         <select id="fBench"><option value="">все бенчи</option></select>
-        <select id="fSlice"><option value="">все срезы</option></select>
+        <select id="fModel" title="модель, чья reasoning-трасса"><option value="">все модели</option></select>
       </div>
       <div class="frow">
-        <select id="fAgent"><option value="">любой агент</option></select>
+        <select id="fAgent" title="показывать трассы, которые размечал этот агент"><option value="">любой агент</option></select>
         <select id="fType"><option value="">все типы событий</option></select>
       </div>
       <div class="frow">
-        <select id="fMine">
-          <option value="">все трассы</option>
-          <option value="unfinished">не дозавершённые</option>
-          <option value="untouched">не начатые</option>
-          <option value="done">завершённые</option>
+        <select id="fMine" title="по моей разметке: начата ли трасса и отвечены ли все её события">
+          <option value="">моя разметка: любая</option>
+          <option value="untouched">не начатые мной</option>
+          <option value="unfinished">начатые, не все события</option>
+          <option value="done">готовые: все события отвечены</option>
         </select>
+        <button class="btn small" id="fReset" title="сбросить все фильтры и поиск">сброс</button>
       </div>
       <div class="fcount" id="filterCount"></div>
     </div>
