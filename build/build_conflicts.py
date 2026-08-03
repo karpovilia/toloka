@@ -37,6 +37,7 @@ POC = os.path.join(BASE, "internal_signals_poc")
 GOLD_CLAUDE = os.path.join(POC, "gold")
 GOLD_DEEPSEEK = os.path.join(POC, "gold_deepseek_dual")
 GOLD_QWEN = os.path.join(POC, "gold_qwen35_dual")
+GOLD_R1 = os.path.join(POC, "gold_deepseek_r1_dual_short")  # deepseek-reasoner (R1) перепроход
 PAYLOADS = os.path.join(POC, "payloads")
 EVENT_TYPES = os.path.join(POC, "verification", "event_types.json")
 DETECTORS = os.path.join(BASE, "reasoning_budget/temporal_process_experiments/hawkes_2026_05_12/detectors.py")
@@ -217,6 +218,7 @@ def main():
 
     Kc = keys_dir(GOLD_CLAUDE, False)
     Kd = keys_dir(GOLD_DEEPSEEK, False)
+    Kr = keys_dir(GOLD_R1, False)  # R1: имена model__bench__qid, как deepseek
     # qwen: ключ по _meta.trace_model
     Kq = {}
     for f in glob.glob(os.path.join(GOLD_QWEN, "*.json")):
@@ -232,9 +234,9 @@ def main():
 
     # Срез = множество LLM-агентов, реально разметивших трассу (C=Claude, D=DeepSeek, Q=Qwen);
     # regex есть везде. После полного Qwen-прогона корпуса (2026-07) 4-way (CDQ) непуст.
-    INITIAL = {"claude": "C", "deepseek": "D", "qwen": "Q"}
+    INITIAL = {"claude": "C", "deepseek": "D", "qwen": "Q", "r1": "R"}
     lab_by_key = {}
-    for k in set(Kc) | set(Kd) | set(Kq):
+    for k in set(Kc) | set(Kd) | set(Kq) | set(Kr):
         d = {}
         if k in Kc:
             d["claude"] = Kc[k]
@@ -242,6 +244,8 @@ def main():
             d["deepseek"] = Kd[k]
         if k in Kq:
             d["qwen"] = Kq[k]
+        if k in Kr:
+            d["r1"] = Kr[k]
         lab_by_key[k] = d
     targets = [("".join(sorted(INITIAL[a] for a in d)), k, d)
                for k, d in sorted(lab_by_key.items())]
@@ -279,7 +283,7 @@ def main():
             # оставляем только события, чей seg_id есть в трассе
             agent_events[ag] = [e for e in evs if e["seg_id"] in segs_by_id]
 
-        present = [a for a in ["regex", "claude", "deepseek", "qwen"] if a in agent_events]
+        present = [a for a in ["regex", "claude", "deepseek", "qwen", "r1"] if a in agent_events]
         if len(present) < 2:
             continue
         n_traces += 1

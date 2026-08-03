@@ -23,7 +23,7 @@ POC = bc.POC
 DATA = os.path.join(ROOT, "toloka", "data")
 TR = os.path.join(DATA, "traces")
 
-AGENT_DIRS = {"claude": bc.GOLD_CLAUDE, "deepseek": bc.GOLD_DEEPSEEK}
+AGENT_DIRS = {"claude": bc.GOLD_CLAUDE, "deepseek": bc.GOLD_DEEPSEEK, "r1": bc.GOLD_R1}
 SHORT2FULL = bc.MODEL_FULL
 FULL2SHORT = {v: k for k, v in SHORT2FULL.items()}
 

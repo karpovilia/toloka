@@ -1,88 +1,88 @@
 {
  "hawkes_by_type": {
   "backtrack": {
-   "mu": 0.0694,
-   "alpha": 0.2101,
-   "beta": 1.8453,
+   "mu": 0.0724,
+   "alpha": 0.4892,
+   "beta": 1.5253,
    "n_seqs": 592
   },
   "verify": {
-   "mu": 0.0505,
+   "mu": 0.049,
    "alpha": 0.489,
    "beta": 1.5253,
-   "n_seqs": 635
+   "n_seqs": 636
   },
   "failed_attempt": {
-   "mu": 0.0146,
-   "alpha": 0.4883,
-   "beta": 1.525,
-   "n_seqs": 244
+   "mu": 0.0135,
+   "alpha": 0.3398,
+   "beta": 0.4188,
+   "n_seqs": 239
   },
   "subgoal_done": {
-   "mu": 0.0419,
+   "mu": 0.0427,
    "alpha": 0.4889,
    "beta": 1.5251,
-   "n_seqs": 492
+   "n_seqs": 495
   },
   "commit": {
-   "mu": 0.0067,
-   "alpha": 0.98,
-   "beta": 0.05,
-   "n_seqs": 600
+   "mu": 0.0135,
+   "alpha": 0.4882,
+   "beta": 1.5205,
+   "n_seqs": 605
   },
   "branch": {
-   "mu": 0.0195,
-   "alpha": 0.4885,
-   "beta": 1.521,
-   "n_seqs": 356
+   "mu": 0.0197,
+   "alpha": 0.2545,
+   "beta": 0.9163,
+   "n_seqs": 358
   },
   "decomposition": {
    "mu": 0.0143,
-   "alpha": 0.4185,
-   "beta": 0.7032,
-   "n_seqs": 148
+   "alpha": 0.4101,
+   "beta": 0.7087,
+   "n_seqs": 146
   },
   "evidence_merge": {
-   "mu": 0.0442,
+   "mu": 0.0439,
    "alpha": 0.4889,
    "beta": 1.5254,
-   "n_seqs": 161
+   "n_seqs": 160
   },
   "internal_use": {
-   "mu": 0.0719,
-   "alpha": 0.6921,
-   "beta": 0.1139,
-   "n_seqs": 148
+   "mu": 0.1724,
+   "alpha": 0.1921,
+   "beta": 0.7077,
+   "n_seqs": 146
   },
   "query_rewrite": {
-   "mu": 0.03,
-   "alpha": 0.8687,
+   "mu": 0.0299,
+   "alpha": 0.8691,
    "beta": 0.05,
-   "n_seqs": 135
+   "n_seqs": 134
   },
   "retrieval_call": {
-   "mu": 0.0236,
-   "alpha": 0.8617,
+   "mu": 0.0235,
+   "alpha": 0.8629,
    "beta": 0.05,
-   "n_seqs": 152
+   "n_seqs": 150
   },
   "contradiction": {
-   "mu": 0.0079,
-   "alpha": 0.2414,
-   "beta": 0.632,
-   "n_seqs": 62
+   "mu": 0.0078,
+   "alpha": 0.2311,
+   "beta": 0.6884,
+   "n_seqs": 59
   },
   "retrieval_inadequate": {
    "mu": 0.0251,
    "alpha": 0.4886,
    "beta": 1.5254,
-   "n_seqs": 97
+   "n_seqs": 95
   }
  },
- "floor": 0.4196,
+ "floor": 0.5277,
  "axis": "seg_id",
  "kernel": "alpha*beta*exp(-beta*dt)",
- "lam_max": 2.045,
+ "lam_max": 2.055,
  "operators": [
   "CONCLUDING",
   "DERIVING",
@@ -92,6 +92,6 @@
   "SETUP",
   "VERIFYING"
  ],
- "n_traces": 679,
+ "n_traces": 682,
  "note": "пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях всех агентов; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt"
 }
