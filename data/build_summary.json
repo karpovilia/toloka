@@ -1,35 +1,39 @@
 {
  "traces_processed": 7075,
- "sites_total": 319119,
- "sites_in_viewer": 5991,
+ "sites_total": 322504,
+ "sites_in_viewer": 5996,
  "by_priority": {
-  "prio2": 21887,
-  "prio1": 203127,
-  "prio3": 75756,
-  "prio4": 18349
+  "prio4": 24346,
+  "prio1": 192806,
+  "prio3": 86236,
+  "prio2": 19116
  },
  "per_agent_site_participation": {
-  "regex": 319119,
-  "deepseek": 224408,
-  "claude": 193628,
-  "qwen": 190011,
-  "r1": 199
+  "regex": 322504,
+  "deepseek": 227793,
+  "r1": 28501,
+  "claude": 194639,
+  "qwen": 190691
  },
  "slices_traces": {
-  "D": 1609,
-  "CDQ": 916,
-  "CD": 882,
-  "DQ": 1050,
-  "DQR": 9,
-  "DR": 3,
+  "DR": 991,
+  "CDQ": 846,
+  "CD": 825,
+  "DQ": 464,
+  "DQR": 595,
+  "CDQR": 70,
+  "CDR": 57,
+  "D": 621,
   "Q": 3347
  },
  "slices_sites_selected": {
-  "CD": 2444,
-  "CDQ": 2143,
-  "DQ": 605,
-  "DQR": 152,
-  "DR": 47,
+  "CD": 1669,
+  "CDQ": 1447,
+  "CDQR": 405,
+  "CDR": 375,
+  "DQ": 370,
+  "DQR": 508,
+  "DR": 622,
   "D": 300,
   "Q": 300
  },
