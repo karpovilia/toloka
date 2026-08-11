@@ -2,11 +2,9 @@
 Строит N-way конфликт-корпус для ручной адъюдикации разметок нескольких «агентов»
 (regex / Claude / DeepSeek / Qwen) на reasoning-трассах.
 
-Реальность данных (важно, см. README):
-  - настоящего 4-угольника на ОДНИХ И ТЕХ ЖЕ трассах нет (пересечение всех четырёх = 0);
-  - Claude ∩ DeepSeek = 1693 трассы (модели gemma/qwen)  -> агенты {regex, claude, deepseek};
-  - Qwen — остров: 485 gpt-oss-трасс, ни с кем не пересекается -> агенты {regex, qwen}.
-Поэтому корпус N-way: на каждой трассе ровно те агенты, кто её реально разметил.
+Реальность данных (важно, см. README): корпус N-way, и на каждой трассе присутствуют
+ровно те LLM-разметчики, которые действительно её обрабатывали. После полного Qwen-прогона
+есть непустые пересечения CDQ/CDQR; R означает DeepSeek-R1.
 
 Событие агента = {seg_id, type, quote}. regex пересчитывается ТЕМ ЖЕ детектором, что и в
 build_verification.py (detectors.detect_events на склеенном тексте сегментов), чтобы быть
@@ -32,7 +30,8 @@ build_verification.py (detectors.detect_events на склеенном текс�
 import json, glob, os, re, argparse, importlib.util, hashlib
 from collections import Counter, defaultdict
 
-BASE = "/home/ki/repos/reasoning"
+TOOL_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+BASE = os.path.abspath(os.environ.get("REASONING_ROOT", os.path.dirname(TOOL_ROOT)))
 POC = os.path.join(BASE, "internal_signals_poc")
 GOLD_CLAUDE = os.path.join(POC, "gold")
 GOLD_DEEPSEEK = os.path.join(POC, "gold_deepseek_dual")
@@ -60,12 +59,50 @@ def san_qid(q):
     return re.sub(r'[^A-Za-z0-9]+', '_', q).strip('_')
 
 
+def canonical_key(model_short, bench, qid):
+    """Единый ключ независимо от qid в виде path/to/id.json или path_to_id_json."""
+    return model_short, bench, san_qid(qid)
+
+
+def annotation_key(path):
+    """Возвращает канонический (model, benchmark, qid) для любого формата gold-файла.
+
+    В корпусе сосуществуют ``model__benchmark__qid.json`` для grid-трасс и
+    ``benchmark__qid.json`` для gpt-oss. Явный префикс имени надёжнее старых
+    ``_meta.trace_model`` (в 300 Claude-файлах это поле ошибочно равно gpt-oss).
+    Имена уже санитизированы сборщиком payload, поэтому для индекса JSON читать не нужно.
+    """
+    stem = os.path.basename(path)[:-5]
+    parts = stem.split("__", 2)
+    prefixed = parts[0] in MODEL_FULL and len(parts) == 3
+    model_short = parts[0] if prefixed else "gptoss"
+    benchmark = parts[1] if prefixed else parts[0]
+    qid = parts[2] if prefixed else stem.split("__", 1)[1] if "__" in stem else ""
+    if not benchmark or not qid:
+        raise RuntimeError(f"в gold-файле нет benchmark/question_id: {path}")
+    return canonical_key(model_short, benchmark, qid)
+
+
+def annotation_index(directory, agent):
+    """Индексирует gold-каталог и останавливается на канонических коллизиях."""
+    index = {}
+    for path in glob.glob(os.path.join(directory, "*.json")):
+        if os.path.basename(path).startswith("_"):
+            continue
+        key = annotation_key(path)
+        old = index.get(key)
+        if old and os.path.realpath(old) != os.path.realpath(path):
+            raise RuntimeError(f"коллизия файлов {agent} для канонического ключа {key}: {old} / {path}")
+        index[key] = path
+    return index
+
+
 def load_events(path, quote_key):
     """Читает events из файла разметки -> [{seg_id, type, quote}]."""
     try:
         d = json.load(open(path))
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError(f"не удалось прочитать разметку {path}: {exc}") from exc
     out = []
     for e in d.get("events", []):
         if "seg_id" not in e or "type" not in e:
@@ -108,6 +145,23 @@ def regex_events_for(pay, dom):
 
 def dom_of(pay):
     return pay.get("domain") or ("R" if pay.get("benchmark") in ("hotpotqa", "musique") else "M")
+
+
+_ALLOWED_TYPES = {}
+
+
+def allowed_types(dom):
+    """Типы, определённые моделью событий для домена трассы.
+
+    LLM-разметчик иногда ставит тип чужого домена (например branch домена M на
+    retrieval-трассе домена R). Вьюер такой тип отрисовать не может — событие
+    отбрасывается на сборке, чтобы снимок оставался согласован с event_types.json.
+    """
+    if not _ALLOWED_TYPES:
+        model = json.load(open(EVENT_TYPES))
+        for name, definition in (model.get("domains") or {}).items():
+            _ALLOWED_TYPES[name] = set((definition.get("types") or {}).keys())
+    return _ALLOWED_TYPES.get(dom, set())
 
 
 def build_sites(agent_events):
@@ -185,10 +239,18 @@ def window(pay_segs_by_id, seg_id, radius):
     return [{"seg_id": i, "text": pay_segs_by_id[i]} for i in ids]
 
 
-def stable_id(cell, qid, site, ans):
+def stable_id(cell, qid, site, ans, seen=None):
+    """Идентификатор сайта. Один агент может сработать на сегменте дважды одним типом —
+    базовый ключ тогда совпадает, и повтору дописывается порядковый суффикс, иначе
+    item_id перестаёт быть первичным ключом корпуса."""
     key = f"{cell}|{san_qid(qid)}|s{site['seg_id']}|" + \
           "|".join(f"{a}:{','.join(ans[a])}" for a in sorted(ans))
-    return f"{cell}|{san_qid(qid)}|s{site['seg_id']}|{hashlib.md5(key.encode()).hexdigest()[:8]}"
+    base = f"{cell}|{san_qid(qid)}|s{site['seg_id']}|{hashlib.md5(key.encode()).hexdigest()[:8]}"
+    if seen is None:
+        return base
+    n = seen[base]
+    seen[base] += 1
+    return base if n == 0 else f"{base}#{n + 1}"
 
 
 def main():
@@ -203,34 +265,10 @@ def main():
     os.makedirs(outdata, exist_ok=True)
 
     # ---- список трасс по срезам ----
-    def keys_dir(d, strip_model):
-        ks = {}
-        for f in glob.glob(os.path.join(d, "*.json")):
-            b = os.path.basename(f)[:-5]
-            if b.startswith("_"):
-                continue
-            p = b.split("__")
-            if strip_model and len(p) == 2:
-                ks[(p[0], p[1])] = f          # (bench, qid) -> path (qwen)
-            elif not strip_model and len(p) == 3:
-                ks[(p[0], p[1], p[2])] = f    # (model, bench, qid) -> path
-        return ks
-
-    Kc = keys_dir(GOLD_CLAUDE, False)
-    Kd = keys_dir(GOLD_DEEPSEEK, False)
-    Kr = keys_dir(GOLD_R1, False)  # R1: имена model__bench__qid, как deepseek
-    # qwen: ключ по _meta.trace_model
-    Kq = {}
-    for f in glob.glob(os.path.join(GOLD_QWEN, "*.json")):
-        if os.path.basename(f).startswith("_"):
-            continue
-        try:
-            dq = json.load(open(f))
-            m = dq["_meta"]
-        except Exception:
-            continue
-        short = {v: k for k, v in MODEL_FULL.items()}.get(m.get("trace_model"), "gptoss")
-        Kq[(short, m.get("benchmark"), dq["question_id"])] = f
+    Kc = annotation_index(GOLD_CLAUDE, "claude")
+    Kd = annotation_index(GOLD_DEEPSEEK, "deepseek")
+    Kr = annotation_index(GOLD_R1, "r1")
+    Kq = annotation_index(GOLD_QWEN, "qwen")
 
     # Срез = множество LLM-агентов, реально разметивших трассу (C=Claude, D=DeepSeek, Q=Qwen);
     # regex есть везде. После полного Qwen-прогона корпуса (2026-07) 4-way (CDQ) непуст.
@@ -257,6 +295,8 @@ def main():
     all_sites = []          # для jsonl
     per_agent_totals = Counter()
     kind_counter = Counter()
+    seen_ids = Counter()    # база item_id -> сколько раз уже встречалась
+    off_domain = Counter()  # (домен, тип, агент) -> сколько событий чужого домена отброшено
     n_traces = 0
 
     for sl, key, lab_paths in targets:
@@ -274,14 +314,23 @@ def main():
         model_full = MODEL_FULL.get(model_short, model_short)
         cell = f"{model_full}__{bench}"
 
+        allowed = allowed_types(dom)
         agent_events = {"regex": regex_events_for(pay, dom)}
         # claude/deepseek quote = trigger_quote; qwen тоже
         for ag, path in lab_paths.items():
             evs = load_events(path, "trigger_quote")
             if evs is None:
                 continue
-            # оставляем только события, чей seg_id есть в трассе
-            agent_events[ag] = [e for e in evs if e["seg_id"] in segs_by_id]
+            # оставляем только события, чей seg_id есть в трассе и чей тип определён в домене
+            kept = []
+            for e in evs:
+                if e["seg_id"] not in segs_by_id:
+                    continue
+                if allowed and e["type"] not in allowed:
+                    off_domain[(dom, e["type"], ag)] += 1
+                    continue
+                kept.append(e)
+            agent_events[ag] = kept
 
         present = [a for a in ["regex", "claude", "deepseek", "qwen", "r1"] if a in agent_events]
         if len(present) < 2:
@@ -296,7 +345,7 @@ def main():
                 continue  # полное согласие — не конфликт
             prio = priority(ans, present)
             item = {
-                "item_id": stable_id(cell, qid, site, ans),
+                "item_id": stable_id(cell, qid, site, ans, seen_ids),
                 "slice": sl, "model": model_full, "benchmark": bench,
                 "question_id": qid, "domain": dom, "cell": cell,
                 "seg_id": site["seg_id"], "segs": site["segs"],
@@ -318,8 +367,7 @@ def main():
         for s in all_sites:
             f.write(json.dumps(s, ensure_ascii=False) + "\n")
 
-    # ---- стратифицированный отбор во вьюер: квота по срезу A/B, внутсреза — тиры приоритета ----
-    # slice B (qwen) обязательно представлен, иначе qwen нечем скорить.
+    # ---- стратифицированный отбор во вьюер: квота по срезу, внутри — тиры приоритета ----
     buckets = defaultdict(list)   # (slice, prio) -> [sites]
     for s in all_sites:
         buckets[(s["slice"], s["priority"])].append(s)
@@ -348,13 +396,33 @@ def main():
     slice_hi = Counter(s["slice"] for s in all_sites if s["priority"] >= 3)
     slices = sorted(slice_sites)
     MIN_SLICE = 300
-    quota = {sl: min(MIN_SLICE, slice_sites[sl]) for sl in slices}
-    rest = args.cap - sum(quota.values())
-    if rest > 0:
-        weight = {sl: slice_hi[sl] for sl in slices}
-        wsum = sum(weight.values()) or 1
+    target_total = min(args.cap, sum(slice_sites.values()))
+    quota = {sl: 0 for sl in slices}
+    # При маленьком --cap раздаём базовую квоту round-robin, не превышая общий cap.
+    for _ in range(MIN_SLICE):
         for sl in slices:
-            quota[sl] += int(rest * weight[sl] / wsum)
+            if sum(quota.values()) >= target_total:
+                break
+            if quota[sl] < slice_sites[sl]:
+                quota[sl] += 1
+    # Остаток — пропорционально числу содержательных LLM-vs-LLM конфликтов.
+    while sum(quota.values()) < target_total:
+        eligible = [sl for sl in slices if quota[sl] < slice_sites[sl]]
+        if not eligible:
+            break
+        weight_sum = sum(slice_hi[sl] for sl in eligible)
+        before = sum(quota.values())
+        room = target_total - before
+        if weight_sum:
+            for sl in eligible:
+                add = min(slice_sites[sl] - quota[sl], int(room * slice_hi[sl] / weight_sum))
+                quota[sl] += add
+        # Округлённый остаток (или все нулевые веса) раздаём детерминированно.
+        if sum(quota.values()) == before:
+            for sl in sorted(eligible, key=lambda x: (-slice_hi[x], x)):
+                if sum(quota.values()) >= target_total:
+                    break
+                quota[sl] += 1
     frac = {4: 0.45, 3: 0.30, 2: 0.10, 1: 0.15}  # чтобы адъюдицировались ВСЕ режимы ошибок
     top = []
     for sl in slices:
@@ -396,13 +464,21 @@ def main():
         s["n_segments"] = len(pay["segments"])
         s["trace_file"] = f"{s['cell']}__{san_qid(s['question_id'])}.json"
         tpath = os.path.join(outtr, s["trace_file"])
-        if s["trace_file"] not in written and not os.path.exists(tpath):
+        if s["trace_file"] not in written:
             json.dump({"cell": s["cell"], "question_id": s["question_id"],
                        "benchmark": s["benchmark"], "domain": s["domain"],
                        "question": pay.get("question", ""),
                        "segments": [{"seg_id": seg["seg_id"], "text": seg["text"]} for seg in pay["segments"]]},
                       open(tpath, "w"), ensure_ascii=False)
         written.add(s["trace_file"])
+
+    # data/traces — генерируемый снимок ровно текущей выборки. Без очистки старые
+    # файлы попадали в traces_index и раздували вьюер после каждой пересборки.
+    stale = []
+    for tpath in glob.glob(os.path.join(outtr, "*.json")):
+        if os.path.basename(tpath) not in written:
+            os.unlink(tpath)
+            stale.append(os.path.basename(tpath))
 
     json.dump(top, open(os.path.join(outdata, "conflicts.json"), "w"), ensure_ascii=False)
 
@@ -414,6 +490,9 @@ def main():
         "traces_processed": n_traces,
         "sites_total": len(all_sites),
         "sites_in_viewer": len(top),
+        "traces_in_viewer": len(written),
+        "stale_traces_removed": len(stale),
+        "off_domain_events_dropped": sum(off_domain.values()),
         "by_priority": dict(kind_counter),
         "per_agent_site_participation": dict(per_agent_totals),
         "slices_traces": dict(slice_traces),
@@ -421,9 +500,13 @@ def main():
         "note": "срез = множество LLM-агентов трассы (C=Claude, D=DeepSeek, Q=Qwen; regex везде); 4-way CDQ непуст после полного Qwen-прогона корпуса",
     }
     json.dump(summary, open(os.path.join(outdata, "build_summary.json"), "w"), ensure_ascii=False, indent=1)
-    print("сайтов всего:", len(all_sites), "| во вьюере:", len(top))
+    print("сайтов всего:", len(all_sites), "| во вьюере:", len(top),
+          "| трасс:", len(written), "| удалено устаревших:", len(stale))
     print("по приоритету:", dict(kind_counter))
     print("участие агентов:", dict(per_agent_totals))
+    if off_domain:
+        print("отброшено событий чужого домена:", sum(off_domain.values()),
+              {f"{d}/{t}/{a}": n for (d, t, a), n in off_domain.most_common(10)})
 
 
 if __name__ == "__main__":

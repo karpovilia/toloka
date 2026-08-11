@@ -27,7 +27,7 @@ def candidates(events):
             for j in range(i + 1, len(evs)):
                 if not used[j] and abs(evs[j]["s"] - evs[i]["s"]) <= TOL:
                     segs.append(evs[j]["s"]); agents.add(evs[j]["a"]); used[j] = True
-            anchor = max(set(segs), key=segs.count)
+            anchor = max(set(segs), key=lambda seg: (segs.count(seg), -seg))
             cands.append({"seg": anchor, "type": t, "agents": sorted(agents)})
     cands.sort(key=lambda c: (c["seg"], c["type"]))
     return cands

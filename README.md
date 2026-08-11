@@ -12,8 +12,9 @@
 
 ## Как это работает
 
-1. Слева — список трасс (584). Открываешь трассу — она показана целиком, слева от текста «карта
-   reasoning» (спаны + интенсивность λ по Хоксу + метки событий).
+1. Слева — список трасс текущего опубликованного снимка. Точное число записано в
+   `data/build_summary.json`. Открываешь трассу — она показана целиком, слева от текста
+   «карта reasoning» (спаны + интенсивность λ по Хоксу + метки событий).
 2. На каждом событии агентов — инлайн-контрол: ✓ подтвердить (реально это событие данного типа),
    ✗ отклонить (ложное срабатывание), либо выбрать другой тип. Событие = кластер срабатываний
    одного типа в окне ±1 сегмента; в скобках видно, какие агенты его нашли.
@@ -29,14 +30,17 @@
 ## Реальность данных
 
 Срез трассы = множество LLM-агентов, реально её разметивших (C = Claude, D = DeepSeek,
-Q = Qwen; regex пересчитывается детектором на каждой трассе). После полного Qwen-прогона
-корпуса (2026-07) появился настоящий 4-way: срез CDQ (regex+Claude+DeepSeek+Qwen) — 1430
-трасс корпуса; остальные комбинации — CD, DQ, Q, D. Во вьюер уходит топ конфликтных сайтов
+Q = Qwen, R = DeepSeek-R1; regex пересчитывается детектором на каждой трассе). Ключ трассы
+канонизируется (`model`, `benchmark`, санитизированный `question_id`), поэтому одна и та же
+трасса из разных каталогов разметки не двоится. Срезы корпуса на 2026-08: DQR 2093, CDQ 1684,
+DQ 1080, CDQR 484, CD 356, DR 269, D 109, CDR 31 трасс; R1 покрывает 2877 трасс, из них
+2577 размечены ещё и Qwen, 515 — ещё и Claude. Во вьюер уходит топ конфликтных сайтов
 (cap 6000): пол в 300 сайтов каждому срезу, остаток — пропорционально числу LLM-vs-LLM
 конфликтов (prio>=3), отбор внутри среза — round-robin по ячейкам модель×бенчмарк (иначе
 кап срезал бы хвост алфавита: musique, qwen-модели). Покрыты все 5 бенчмарков (math500,
-gpqa_diamond, hle, hotpotqa, musique) и все 3 модели. Точные счётчики сборки — в
-`data/build_summary.json`.
+gpqa_diamond, hle, hotpotqa, musique) и все 3 модели. Событие с типом чужого домена (например
+`branch` домена M на retrieval-трассе домена R) отбрасывается на сборке: вьюер его не
+отрисует. Точные счётчики сборки — в `data/build_summary.json`.
 
 ## Карта reasoning
 
@@ -66,7 +70,8 @@ gpqa_diamond, hle, hotpotqa, musique) и все 3 модели. Точные с�
 - Файлом: «экспорт» -> `annot_<ник>.json` -> в `annotations/` -> `git push`.
 - Коммитом из браузера («💾 GitHub»): owner/repo/branch/path + fine-grained PAT (`contents:write`);
   файл `<path>/annot_<ник>.json` уходит в api.github.com. Работает с приватным репо. Токен — только
-  в localStorage браузера, в страницу не зашит.
+  в sessionStorage браузера до закрытия вкладки, в страницу не зашит. Ник аннотатора приводится
+  к безопасному имени файла (`A-Za-z0-9._-`).
 
 ## Deep-link
 
@@ -74,9 +79,25 @@ gpqa_diamond, hle, hotpotqa, musique) и все 3 модели. Точные с�
 
 ## Сборка данных
 
-    python3 build/build_conflicts.py --cap 6000 --radius 12   # (легаси, задаёт набор 584 трасс)
+    # По умолчанию REASONING_ROOT = родитель каталога toloka; можно переопределить.
+    REASONING_ROOT=/path/to/reasoning python3 build/build_conflicts.py --cap 6000 --radius 12
     python3 build/build_trace_maps.py                          # события/спаны/λ в data/traces/*.json
     python3 build/build_traces_index.py                        # data/traces_index.json (список трасс)
+    python3 build/validate_data.py                              # обязательная проверка согласованности
+
+`build_conflicts.py` нормализует разные формы одного `question_id`, полностью обновляет
+генерируемые trace-файлы и удаляет устаревшие файлы, которые больше не входят в выборку.
+Для пересборки карты нужны `numpy` и `scipy`.
+
+## Локальная проверка интерфейса
+
+    npm install
+    npm run check
+    npm test
+
+Версии Node соответствуют `engines` в `package.json` (LTS 20.19+ / 22.13+ и 24+).
+Smoke-тест не содержит абсолютных путей и использует локальный `jsdom`. Минимальная
+проверка данных без Node: `python3 build/validate_data.py`.
 
 ## Структура
 
@@ -88,4 +109,4 @@ gpqa_diamond, hle, hotpotqa, musique) и все 3 модели. Точные с�
     data/event_types.json            модель типов событий (домены M/R)
     data/score_report.md             отчёт по score
     annotations/                     сюда кладут annot_<ник>.json
-    build/                           build_trace_maps.py · build_traces_index.py · score_agents.py · test_viewer_smoke.js
+    build/                           сборщики · validate_data.py · score_agents.py · test_viewer_smoke.js

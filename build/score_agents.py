@@ -72,14 +72,14 @@ def build_candidates(events):
             for j in range(i + 1, len(evs)):
                 if not used[j] and abs(evs[j]["s"] - evs[i]["s"]) <= TOL:
                     segs.append(evs[j]["s"]); agents.add(evs[j]["a"]); used[j] = True
-            anchor = max(set(segs), key=segs.count)
+            anchor = max(set(segs), key=lambda seg: (segs.count(seg), -seg))
             cands.append({"seg": anchor, "type": t, "agents": sorted(agents)})
     return cands
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--root", default="/home/ki/repos/reasoning/toloka")
+    ap.add_argument("--root", default=os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     args = ap.parse_args()
     data = os.path.join(args.root, "data"); anndir = os.path.join(args.root, "annotations")
     os.makedirs(anndir, exist_ok=True)

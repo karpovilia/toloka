@@ -35,12 +35,13 @@ const OP_DESC = {
 const opTitle = (op) => "спан " + op + (OP_DESC[op] ? " — " + OP_DESC[op] : "");
 const typeDesc = (t) => (S.model && S.model.typesById[t] && S.model.typesById[t].definition) || "";
 const typeTitle = (t) => provTitle(t) + (typeDesc(t) ? " — " + typeDesc(t) : "");
+const safeAnnotatorId = (id) => (String(id || "").trim().replace(/[^A-Za-z0-9._-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 80) || "anon");
 
 const S = {
   model: null, index: [], filtered: [], tidx: 0,
   curTF: null, trace: null, cands: [], candBySeg: new Map(), selSeg: null,
   myAnnot: {}, pool: [], cfg: null, mapMeta: null,
-  annotatorId: localStorage.getItem("tv_last_annotator") || "ki",
+  annotatorId: safeAnnotatorId(localStorage.getItem("tv_last_annotator") || "ki"),
   traces: {}, view: null, scrolling: false, wholeTrace: true, linkedSeg: null,
 };
 
@@ -61,7 +62,9 @@ function setVerdict(cand, v) {
   if (cur === v) delete S.myAnnot[id];
   else S.myAnnot[id] = { verdict: v, notes: (S.myAnnot[id] && S.myAnnot[id].notes) || "", updated: new Date().toISOString() };
   saveMyAnnot();
-  updateCandDom(id); renderSelLine(); renderTraceProgress(); renderProgress(); renderTraceRow(S.tidx);
+  updateCandDom(id); renderSelLine(); renderTraceProgress(); renderProgress();
+  const pos = S.filtered.findIndex(i => S.index[i].trace_file === S.curTF);
+  if (pos >= 0) renderTraceRow(pos);
 }
 function verdictLabel(v) { return v === CONFIRM ? "✓ да" : v === REJECT ? "✗ нет (FP)" : v ? "→ " + v : ""; }
 
@@ -96,7 +99,8 @@ function fillSelect(sel, vals, allLabel) { const s = $(sel); if (!s) return; s.i
 async function loadTrace(tf) {
   if (S.traces[tf] === undefined) {
     const t = await tryFetch((S.cfg && S.cfg.traces_dir || "data/traces") + "/" + tf);
-    S.traces[tf] = t ? JSON.parse(t) : null;
+    try { S.traces[tf] = t ? JSON.parse(t) : null; }
+    catch (e) { S.traces[tf] = null; toast("trace JSON: " + e.message); }
   }
   return S.traces[tf];
 }
@@ -143,7 +147,9 @@ function applyFilters() {
     S.filtered.push(i);
   });
   $("#filterCount").textContent = `${S.filtered.length} из ${S.index.length} трасс`;
-  if (S.tidx >= S.filtered.length) S.tidx = 0;
+  const current = S.curTF ? S.filtered.findIndex(i => S.index[i].trace_file === S.curTF) : -1;
+  if (current >= 0) S.tidx = current;
+  else if (S.tidx >= S.filtered.length) S.tidx = 0;
   renderTraceList(); renderProgress();
 }
 function renderProgress() {
@@ -176,10 +182,18 @@ function renderTraceRow(pos) {
 }
 
 /* ---------- open + render trace ---------- */
-const curTrace = () => S.filtered.length ? S.index[S.filtered[S.tidx]] : null;
+const curTrace = () => S.index.find(x => x.trace_file === S.curTF) || null;
 async function openTrace(tf, opts = {}) {
   S.curTF = tf; S.view = null;
   const tr = await loadTrace(tf);
+  // Быстрые клики/deep-link могут завершить fetch не в порядке запуска.
+  if (S.curTF !== tf) return;
+  if (!tr) {
+    S.trace = null; S.cands = []; S.candBySeg = new Map(); S.selSeg = null;
+    $("#qLabel").textContent = "не удалось загрузить трассу: " + tf;
+    $("#traceBody").innerHTML = ""; $("#curEvent").innerHTML = "";
+    renderTraceProgress(); return;
+  }
   S.trace = tr;
   S.cands = tr ? buildCandidates(tr.events) : [];
   S.candBySeg = new Map();
@@ -532,7 +546,11 @@ function openTree() {
 }
 
 /* ---------- deep-link / share ---------- */
-function parseHash() { const p = {}; for (const kv of location.hash.replace(/^#/, "").split("&")) { const i = kv.indexOf("="); if (i > 0) p[kv.slice(0, i)] = decodeURIComponent(kv.slice(i + 1)); } return p; }
+function parseHash() {
+  const p = {};
+  for (const [key, value] of new URLSearchParams(location.hash.replace(/^#/, ""))) p[key] = value;
+  return p;
+}
 function updateHash() {
   if (!S.curTF) return;
   let h = "#trace=" + encodeURIComponent(S.curTF);
@@ -542,8 +560,14 @@ function updateHash() {
 function applyHash(p) {
   p = p || parseHash();
   if (!p.trace) return false;
-  const pos = S.filtered.findIndex(i => S.index[i].trace_file === p.trace);
-  if (pos >= 0) { S.tidx = pos; renderTraceList(); }
+  const absolute = S.index.findIndex(x => x.trace_file === p.trace);
+  if (absolute < 0) { toast("трассы нет в текущем индексе"); return false; }
+  let pos = S.filtered.indexOf(absolute);
+  if (pos < 0) {
+    resetFilters(false);
+    pos = S.filtered.indexOf(absolute);
+  }
+  S.tidx = pos; renderTraceList();
   openTrace(p.trace, { seg: p.seg != null ? parseInt(p.seg) : null });
   return true;
 }
@@ -561,7 +585,14 @@ function copyLineLink(seg) {
 function annotPayload() { return { annotator_id: S.annotatorId, exported: new Date().toISOString(), tool: "toloka-v2", annotations: S.myAnnot }; }
 function download(name, obj) { const blob = new Blob([JSON.stringify(obj, null, 1)], { type: "application/json" }); const a = el("a"); a.href = URL.createObjectURL(blob); a.download = name; a.click(); URL.revokeObjectURL(a.href); }
 function ghCfg() { try { return JSON.parse(localStorage.getItem("tv_gh") || "{}"); } catch { return {}; } }
-function ghSave() { const c = { owner: $("#ghOwner").value.trim(), repo: $("#ghRepo").value.trim(), branch: $("#ghBranch").value.trim() || "main", path: $("#ghPath").value.trim() || "annotations", token: $("#ghToken").value.trim() }; localStorage.setItem("tv_gh", JSON.stringify(c)); toast("настройки GitHub сохранены"); return c; }
+function ghSave() {
+  const c = { owner: $("#ghOwner").value.trim(), repo: $("#ghRepo").value.trim(), branch: $("#ghBranch").value.trim() || "main", path: $("#ghPath").value.trim() || "annotations" };
+  const token = $("#ghToken").value.trim();
+  localStorage.setItem("tv_gh", JSON.stringify(c));
+  if (token) sessionStorage.setItem("tv_gh_token", token); else sessionStorage.removeItem("tv_gh_token");
+  toast("настройки GitHub сохранены; токен — до закрытия вкладки");
+  return { ...c, token };
+}
 function b64(str) { return btoa(unescape(encodeURIComponent(str))); }
 async function ghCommit() {
   const c = ghSave(); if (!c.owner || !c.repo || !c.token) { toast("заполни owner / repo / token"); return; }
@@ -581,12 +612,12 @@ async function ghCommit() {
 /* ---------- events ---------- */
 function bind() {
   $("#annotatorId").value = S.annotatorId;
-  $("#annotatorId").onchange = () => { S.annotatorId = $("#annotatorId").value.trim() || "anon"; localStorage.setItem("tv_last_annotator", S.annotatorId); loadMyAnnot(); applyFilters(); if (S.curTF) renderTrace(false); toast("аннотатор: " + S.annotatorId); };
+  $("#annotatorId").onchange = () => { S.annotatorId = safeAnnotatorId($("#annotatorId").value); $("#annotatorId").value = S.annotatorId; localStorage.setItem("tv_last_annotator", S.annotatorId); loadMyAnnot(); applyFilters(); if (S.curTF) renderTrace(false); toast("аннотатор: " + S.annotatorId); };
   $("#importAnnot").onchange = ev => { for (const f of ev.target.files) { const r = new FileReader(); r.onload = () => { try { const j = JSON.parse(r.result); if (j.annotator_id === S.annotatorId) { Object.assign(S.myAnnot, j.annotations || {}); saveMyAnnot(); toast("загружена МОЯ разметка"); } else { S.pool = S.pool.filter(p => p.annotator_id !== j.annotator_id); S.pool.push(j); toast("подключена разметка: " + j.annotator_id); } applyFilters(); if (S.curTF) renderTrace(false); } catch { toast("не JSON"); } }; r.readAsText(f); } };
   $("#exportAnnot").onclick = () => download(`annot_${S.annotatorId}.json`, annotPayload());
   $("#ghBtn").onclick = () => $("#ghPanel").classList.toggle("hidden");
   const g = ghCfg();
-  $("#ghOwner").value = g.owner || "karpovilia"; $("#ghRepo").value = g.repo || "toloka"; $("#ghBranch").value = g.branch || "main"; $("#ghPath").value = g.path || "annotations"; $("#ghToken").value = g.token || "";
+  $("#ghOwner").value = g.owner || "karpovilia"; $("#ghRepo").value = g.repo || "toloka"; $("#ghBranch").value = g.branch || "main"; $("#ghPath").value = g.path || "annotations"; $("#ghToken").value = sessionStorage.getItem("tv_gh_token") || "";
   $("#ghSaveCfg").onclick = ghSave; $("#ghCommit").onclick = ghCommit;
   $("#shareBtn").onclick = shareLink;
   $("#listToggle").onclick = () => { $("#main").classList.toggle("nolist"); $("#listToggle").classList.toggle("on"); };
@@ -600,7 +631,7 @@ function bind() {
   $("#traceBody").addEventListener("scroll", () => { closeDrill(); if (S.scrolling) return; S.scrolling = true; requestAnimationFrame(() => { S.scrolling = false; onCtxScroll(); }); });
   document.addEventListener("click", closeDrill);
   ["textSearch", "fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); if (e) e.oninput = e.onchange = applyFilters; });
-  const frst = $("#fReset"); if (frst) frst.onclick = () => { ["fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); if (e) e.value = ""; }); const ts = $("#textSearch"); if (ts) ts.value = ""; applyFilters(); toast("фильтры сброшены"); };
+  const frst = $("#fReset"); if (frst) frst.onclick = () => resetFilters(true);
   document.addEventListener("keydown", ev => {
     if (/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)) return;
     if (ev.key === "[") return selTrace(-1);
@@ -614,6 +645,11 @@ function bind() {
     else if (ev.key === "2" && c) setVerdict(c, REJECT);
   });
 }
+function resetFilters(notify) {
+  ["fBench", "fModel", "fAgent", "fType", "fMine"].forEach(id => { const e = $("#" + id); if (e) e.value = ""; });
+  const ts = $("#textSearch"); if (ts) ts.value = "";
+  applyFilters(); if (notify) toast("фильтры сброшены");
+}
 function selTrace(d) { if (!S.filtered.length) return; S.tidx = (S.tidx + d + S.filtered.length) % S.filtered.length; renderTraceList(); openTrace(S.index[S.filtered[S.tidx]].trace_file); }
 
 /* ---------- init ---------- */
@@ -621,7 +657,9 @@ function selTrace(d) { if (!S.filtered.length) return; S.tidx = (S.tidx + d + S.
   bind(); loadMyAnnot();
   const boot = parseHash();
   const cfgTxt = await tryFetch("config.json");
-  S.cfg = cfgTxt ? JSON.parse(cfgTxt) : { event_types: "data/event_types.json", traces_index: "data/traces_index.json", traces_dir: "data/traces", trace_maps_meta: "data/trace_maps_meta.json" };
+  const fallbackCfg = { event_types: "data/event_types.json", traces_index: "data/traces_index.json", traces_dir: "data/traces", trace_maps_meta: "data/trace_maps_meta.json" };
+  try { S.cfg = cfgTxt ? JSON.parse(cfgTxt) : fallbackCfg; }
+  catch (e) { S.cfg = fallbackCfg; toast("config.json: " + e.message); }
   const mm = await tryFetch(S.cfg.trace_maps_meta || "data/trace_maps_meta.json"); if (mm) try { S.mapMeta = JSON.parse(mm); } catch {}
   const et = await tryFetch(S.cfg.event_types); if (et) try { setModel(JSON.parse(et)); } catch (e) { toast("event_types: " + e.message); }
   const ix = await tryFetch(S.cfg.traces_index || "data/traces_index.json"); if (ix) try { setIndex(JSON.parse(ix)); } catch (e) { toast("traces_index: " + e.message); }

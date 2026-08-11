@@ -4,7 +4,9 @@
    проверяет: список трасс; авто-открытие; кандидаты+инлайн-чипы; ✓/✗ пишут вердикт;
    навигация j/k; retype; прогресс; deep-link на трассу; экспорт; GitHub PUT. */
 const fs = require("fs"), path = require("path");
-const { JSDOM } = require(path.join("/home/ki/repos/reasoning/internal_signals_poc/trace_verifier/node_modules/jsdom"));
+let JSDOM;
+try { ({ JSDOM } = require("jsdom")); }
+catch { console.error("jsdom не установлен: выполните `npm install` в корне toloka"); process.exit(2); }
 
 const DIR = path.join(__dirname, "..");
 const html = fs.readFileSync(path.join(DIR, "index.html"), "utf8");
@@ -109,18 +111,35 @@ setTimeout(() => {
   // 6) экспорт
   $("#exportAnnot").click();
   ok(lastExport === "annot_ki.json", "экспорт: " + lastExport);
-  // 7) deep-link на t2
+  // 7) deep-link на скрытую фильтром t2 должен сбросить фильтры
+  $("#fModel").value = "gemma"; $("#fModel").dispatchEvent(new window.Event("change"));
+  ok($("#filterCount").textContent.includes("1 из 2"), "фильтр скрыл t2");
   window.location.hash = "#trace=t2.json";
   window.dispatchEvent(new window.Event("hashchange"));
   setTimeout(() => {
     ok($("#qLabel").textContent.includes("q2"), "deep-link открыл t2: " + $("#qLabel").textContent.slice(0, 40));
     ok($$("#traceBody .ev").length === 1, "t2: 1 кандидат (regex+qwen merged): " + $$("#traceBody .ev").length);
+    ok($("#fModel").value === "", "deep-link сбросил несовместимый фильтр");
+    // app.js в strict-режиме, его функции не видны снаружи — проверяем поведением:
+    // битый percent-escape не должен ронять обработчик hashchange (URIError у decodeURIComponent).
+    let hashError = null;
+    const onHashError = () => { hashError = "исключение в обработчике hashchange"; };
+    window.addEventListener("error", onHashError);
+    window.location.hash = "#trace=%E0%A4%A";
+    window.dispatchEvent(new window.Event("hashchange"));
+    ok(hashError === null, "битый percent-escape в hash не роняет обработчик" + (hashError ? ": " + hashError : ""));
+    window.removeEventListener("error", onHashError);
+    window.location.hash = "#trace=t2.json";
+    window.dispatchEvent(new window.Event("hashchange"));
     // 8) GitHub PUT
     $("#ghOwner").value = "karpovilia"; $("#ghRepo").value = "toloka"; $("#ghToken").value = "github_pat_x";
     $("#ghCommit").click();
     setTimeout(() => {
       ok(ghPut && ghPut.content, "GitHub PUT ушёл");
       if (ghPut) { const dec = JSON.parse(Buffer.from(ghPut.content, "base64").toString("utf8")); ok(dec.tool === "toloka-v2" && dec.annotations, "PUT-контент = annot v2"); }
+      const savedCfg = JSON.parse(store.getItem("tv_gh") || "{}");
+      ok(!Object.prototype.hasOwnProperty.call(savedCfg, "token"), "PAT не попал в localStorage");
+      ok(window.sessionStorage.getItem("tv_gh_token") === "github_pat_x", "PAT живёт только в sessionStorage");
       console.log(fail ? `\nFAILED (${fail})` : "\nALL OK");
       process.exit(fail ? 1 : 0);
     }, 120);

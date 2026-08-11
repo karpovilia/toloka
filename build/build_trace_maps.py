@@ -20,7 +20,7 @@ import build_conflicts as bc  # payload_for, regex_events_for, load_events, MODE
 
 ROOT = bc.BASE
 POC = bc.POC
-DATA = os.path.join(ROOT, "toloka", "data")
+DATA = os.path.join(bc.TOOL_ROOT, "data")
 TR = os.path.join(DATA, "traces")
 
 AGENT_DIRS = {"claude": bc.GOLD_CLAUDE, "deepseek": bc.GOLD_DEEPSEEK, "r1": bc.GOLD_R1}
@@ -28,22 +28,12 @@ SHORT2FULL = bc.MODEL_FULL
 FULL2SHORT = {v: k for k, v in SHORT2FULL.items()}
 
 
-def qwen_index():
-    """(short,bench,qid) -> path к qwen dual-файлу (трассы gpt-oss)."""
-    idx = {}
-    for f in glob.glob(os.path.join(bc.GOLD_QWEN, "*.json")):
-        if os.path.basename(f).startswith("_"):
-            continue
-        try:
-            d = json.load(open(f)); m = d["_meta"]
-        except Exception:
-            continue
-        short = FULL2SHORT.get(m.get("trace_model"), "gptoss")
-        idx[(short, m.get("benchmark"), d["question_id"])] = f
-    return idx
+def annotation_indices():
+    return {agent: bc.annotation_index(directory, agent)
+            for agent, directory in {**AGENT_DIRS, "qwen": bc.GOLD_QWEN}.items()}
 
 
-def events_union(model_short, bench, qid, pay, dom, qwen_idx):
+def events_union(model_short, bench, qid, pay, dom, indices):
     """Все события всех агентов: [{s,t,a}]. И какие агенты присутствуют."""
     segset = {s["seg_id"] for s in pay["segments"]}
     ev, agents = [], []
@@ -52,33 +42,24 @@ def events_union(model_short, bench, qid, pay, dom, qwen_idx):
         if e["seg_id"] in segset:
             ev.append({"s": e["seg_id"], "t": e["type"], "a": "regex"})
     agents.append("regex")
-    # claude / deepseek — по имени <short>__<bench>__<qid>
-    for ag, d in AGENT_DIRS.items():
-        p = os.path.join(d, f"{model_short}__{bench}__{bc.san_qid(qid)}.json")
-        if not os.path.exists(p):
-            p = os.path.join(d, f"{model_short}__{bench}__{qid}.json")
-        evs = bc.load_events(p, "trigger_quote") if os.path.exists(p) else None
-        if evs:
+    key = bc.canonical_key(model_short, bench, qid)
+    allowed = bc.allowed_types(dom)
+    for ag in ("claude", "deepseek", "qwen", "r1"):
+        p = indices[ag].get(key)
+        evs = bc.load_events(p, "trigger_quote") if p else None
+        if evs is not None:
             for e in evs:
-                if e["seg_id"] in segset:
+                # тип чужого домена вьюер отрисовать не может — отбрасываем, как в build_conflicts
+                if e["seg_id"] in segset and (not allowed or e["type"] in allowed):
                     ev.append({"s": e["seg_id"], "t": e["type"], "a": ag})
             agents.append(ag)
-    # qwen — по _meta-индексу (gpt-oss)
-    qp = qwen_idx.get((model_short, bench, qid))
-    if qp:
-        evs = bc.load_events(qp, "trigger_quote")
-        if evs:
-            for e in evs:
-                if e["seg_id"] in segset:
-                    ev.append({"s": e["seg_id"], "t": e["type"], "a": "qwen"})
-            agents.append("qwen")
     return ev, agents
 
 
-def spans_for(model_short, bench, qid, qwen_idx):
+def spans_for(model_short, bench, qid, indices):
     """Операторные спаны: deepseek (если есть) иначе qwen. [{a,b,op}]."""
-    p = os.path.join(bc.GOLD_DEEPSEEK, f"{model_short}__{bench}__{bc.san_qid(qid)}.json")
-    src = p if os.path.exists(p) else qwen_idx.get((model_short, bench, qid))
+    key = bc.canonical_key(model_short, bench, qid)
+    src = indices["deepseek"].get(key) or indices["qwen"].get(key)
     if not src or not os.path.exists(src):
         return []
     try:
@@ -199,20 +180,26 @@ def gather_full():
     conflicts = json.load(open(os.path.join(DATA, "conflicts.json")))
     traces = {}
     for c in conflicts:
-        key = (c["cell"], c["question_id"])
+        key = c["trace_file"]
         if key not in traces:
             mshort = FULL2SHORT.get(c["model"], c["model"])
             traces[key] = {"model_short": mshort, "model": c["model"], "bench": c["benchmark"],
                            "qid": c["question_id"], "domain": c["domain"], "trace_file": c["trace_file"]}
-    qwen_idx = qwen_index()
+        else:
+            prev = traces[key]
+            now = (c["cell"], bc.san_qid(c["question_id"]))
+            old = (f"{prev['model']}__{prev['bench']}", bc.san_qid(prev["qid"]))
+            if now != old:
+                raise RuntimeError(f"коллизия trace_file {key}: {old} / {now}")
+    indices = annotation_indices()
     per_trace = {}
     for key, tr in traces.items():
         pp = bc.payload_for(tr["model_short"], tr["bench"], tr["qid"])
         if not pp:
             continue
         pay = json.load(open(pp))
-        ev, agents = events_union(tr["model_short"], tr["bench"], tr["qid"], pay, tr["domain"], qwen_idx)
-        sp = spans_for(tr["model_short"], tr["bench"], tr["qid"], qwen_idx)
+        ev, agents = events_union(tr["model_short"], tr["bench"], tr["qid"], pay, tr["domain"], indices)
+        sp = spans_for(tr["model_short"], tr["bench"], tr["qid"], indices)
         per_trace[key] = {"ev": ev, "sp": sp, "agents": agents, "n": len(pay["segments"]),
                           "trace_file": tr["trace_file"], "write_evspans": True}
     return per_trace

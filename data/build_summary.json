@@ -1,41 +1,42 @@
 {
- "traces_processed": 7075,
- "sites_total": 322504,
- "sites_in_viewer": 5996,
+ "traces_processed": 5631,
+ "sites_total": 254498,
+ "sites_in_viewer": 6000,
+ "traces_in_viewer": 871,
+ "stale_traces_removed": 0,
+ "off_domain_events_dropped": 8,
  "by_priority": {
-  "prio4": 24346,
-  "prio1": 192806,
-  "prio3": 86236,
-  "prio2": 19116
+  "prio4": 34913,
+  "prio1": 111638,
+  "prio3": 103907,
+  "prio2": 4040
  },
  "per_agent_site_participation": {
-  "regex": 322504,
-  "deepseek": 227793,
-  "r1": 28501,
-  "claude": 194639,
-  "qwen": 190691
+  "regex": 254498,
+  "deepseek": 254498,
+  "r1": 42026,
+  "claude": 213586,
+  "qwen": 189840
  },
  "slices_traces": {
-  "DR": 991,
-  "CDQ": 846,
-  "CD": 825,
-  "DQ": 464,
-  "DQR": 595,
-  "CDQR": 70,
-  "CDR": 57,
-  "D": 621,
-  "Q": 3347
+  "DR": 269,
+  "CDQ": 1684,
+  "CD": 356,
+  "DQ": 1080,
+  "DQR": 2093,
+  "CDQR": 484,
+  "CDR": 31,
+  "D": 109
  },
  "slices_sites_selected": {
-  "CD": 1669,
-  "CDQ": 1447,
-  "CDQR": 405,
-  "CDR": 375,
-  "DQ": 370,
-  "DQR": 508,
-  "DR": 622,
-  "D": 300,
-  "Q": 300
+  "CD": 1031,
+  "CDQ": 2072,
+  "CDQR": 604,
+  "CDR": 323,
+  "DQ": 442,
+  "DQR": 851,
+  "DR": 377,
+  "D": 300
  },
  "note": "срез = множество LLM-агентов трассы (C=Claude, D=DeepSeek, Q=Qwen; regex везде); 4-way CDQ непуст после полного Qwen-прогона корпуса"
 }

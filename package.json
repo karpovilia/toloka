@@ -1,0 +1,16 @@
+{
+  "name": "reasoning-trace-annotator",
+  "private": true,
+  "version": "2.1.0",
+  "description": "Static verifier for events on reasoning traces",
+  "scripts": {
+    "check": "node --check app.js && node --check build/test_viewer_smoke.js",
+    "test": "node build/test_viewer_smoke.js"
+  },
+  "devDependencies": {
+    "jsdom": "29.1.1"
+  },
+  "engines": {
+    "node": "^20.19.0 || ^22.13.0 || >=24.0.0"
+  }
+}
