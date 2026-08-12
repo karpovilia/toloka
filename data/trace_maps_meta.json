@@ -92,6 +92,6 @@
   "SETUP",
   "VERIFYING"
  ],
- "n_traces": 871,
- "note": "пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях всех агентов; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt"
+ "n_traces": 1893,
+ "note": "пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях всех агентов; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt | срез native-PO использует те же параметры (не перефитим, чтобы шкала λ была сравнима между корпусами)"
 }

@@ -34,6 +34,7 @@ jobs:
           npm run check
           npm test
           python build/validate_data.py
+          python build/check_no_gpqa.py
           rm -rf node_modules
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3

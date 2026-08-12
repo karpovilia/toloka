@@ -10,8 +10,8 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
-const AGENT_COLOR = { regex: "#f76b15", claude: "#d97757", deepseek: "#4c8dff", qwen: "#8e4ec6", r1: "#e5484d" };
-const AGENT_LABEL = { regex: "regex", claude: "Claude", deepseek: "DeepSeek", qwen: "Qwen", r1: "DeepSeek-R1" };
+const AGENT_COLOR = { regex: "#f76b15", claude: "#d97757", deepseek: "#4c8dff", qwen: "#8e4ec6", r1: "#e5484d", judge: "#12a594" };
+const AGENT_LABEL = { regex: "regex", claude: "Claude", deepseek: "DeepSeek", qwen: "Qwen", r1: "DeepSeek-R1", judge: "судья DeepSeek" };
 const PALETTE = ["#e5484d", "#30a46c", "#8e4ec6", "#0091ff", "#f76b15", "#ffb224", "#12a594", "#e93d82", "#6e56cf", "#46a758", "#d6409f", "#5b5bd6"];
 const OP_COLOR = { SETUP: "#6e56cf", DERIVING: "#4c8dff", EXPLORING: "#f76b15", VERIFYING: "#12a594", REVISING: "#e5484d", CONCLUDING: "#46a758", GROUNDING: "#8e4ec6" };
 const FORK = { branch: "◇", backtrack: "◄", failed_attempt: "✗" };
@@ -158,7 +158,7 @@ function renderProgress() {
 }
 function renderTraceList() {
   const ul = $("#traceList"); ul.innerHTML = "";
-  const cap = 800, n = Math.min(S.filtered.length, cap);
+  const cap = 2000, n = Math.min(S.filtered.length, cap);   // снимок вырос до ~1.9k трасс: без фильтра виден весь
   for (let pos = 0; pos < n; pos++) ul.appendChild(traceRow(pos));
   if (S.filtered.length > n) ul.appendChild(el("li", "muted", `…ещё ${S.filtered.length - n} (сузь фильтр)`));
 }
