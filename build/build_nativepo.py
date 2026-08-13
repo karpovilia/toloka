@@ -24,14 +24,16 @@ GPQA-diamond НЕ ПУБЛИКУЕТСЯ. Репозиторий и Pages пуб
 закрытые, поэтому трассы по вопросам этого бенчмарка исключаются целиком — ни текста вопроса,
 ни текста рассуждения. Остаются MATH500 и BBH, оба публичные. Проверка: build/check_no_gpqa.py.
 
-Скрипт ДОМЕШИВАЕТ срез в опубликованный снимок вьюера рядом со старым корпусом
-(data/traces/npo-*.json + строки среза в data/conflicts.json) и идемпотентен: свои артефакты
-он сначала удаляет, потом пишет заново. Порядок сборки:
+С 2026-08-13 это единственный корпус вьюера: старый N-way конфликт-корпус (агенты
+Claude/DeepSeek/Qwen/DeepSeek-R1) снят с публикации, потому что публиковал 170 трасс
+закрытого GPQA-diamond, и унесён в приватный архив
+internal_signals_poc/toloka_archive_2026_08_13. Скрипт идемпотентен: свои артефакты
+(data/traces/npo-*.json и строки среза в data/conflicts.json) он сначала удаляет, потом
+пишет заново. Порядок сборки:
   python3 build/build_nativepo.py
-  python3 build/build_traces_index.py     # индекс вьюера по объединённому снимку
+  python3 build/build_traces_index.py     # индекс вьюера
   python3 build/validate_data.py
-Легаси-пересборка build_conflicts.py чистит data/traces от чужих файлов, поэтому после неё
-этот скрипт (и build_traces_index.py) нужно прогнать повторно.
+  python3 build/check_no_gpqa.py          # запрет публикации GPQA на всём снимке
 """
 from __future__ import annotations
 
@@ -269,13 +271,11 @@ def main():
 
     trace_files = glob.glob(os.path.join(TR, "*.json"))
     summary_path = os.path.join(DATA, "build_summary.json")
-    summary = json.load(open(summary_path))
-    summary["traces_in_viewer"] = len(trace_files)
-    summary["sites_in_viewer"] = len(merged)
-    summary["nativepo"] = {
+    archived = json.load(open(summary_path)).get("archived_2026_08_13", "")
+    summary = {
         "corpus": CORPUS, "slice": SLICE, "judge_model": "deepseek-chat",
         "agents": ["regex", JUDGE_AGENT],
-        "traces": n_traces, "sites": len(sites_out),
+        "traces_in_viewer": len(trace_files), "sites_in_viewer": len(merged),
         "traces_dropped_gpqa": n_dropped_gpqa,
         "benchmarks": dict(benchmarks),
         "by_kind": dict(stat_kind),
@@ -285,11 +285,13 @@ def main():
         "event_drops": dict(ev_drops), "span_drops": dict(sp_drops),
         "note": ("срез судья-против-регулярок на восьми моделях одного корпуса; GPQA-diamond "
                  "исключён целиком (закрытый доступ), остаются MATH500 и BBH"),
+        "archived_2026_08_13": archived,
     }
     json.dump(summary, open(summary_path, "w"), ensure_ascii=False, indent=1)
 
-    # λ нового среза считается по параметрам Хокса, зафиксированным на старом корпусе:
-    # так шкала интенсивности сравнима между срезами, а старые трассы не переписываются.
+    # λ среза считается по параметрам Хокса, зафиксированным на старом корпусе (он в приватном
+    # архиве): так шкала интенсивности остаётся сравнимой с уже посчитанной, параметры не
+    # перефитятся.
     meta_path = os.path.join(DATA, "trace_maps_meta.json")
     meta = json.load(open(meta_path))
     lam_max = meta.get("lam_max", 0.0)
@@ -302,9 +304,10 @@ def main():
     for obj in trace_rows.values():
         ops.update(s["op"] for s in obj["spans"])
     meta["operators"] = sorted(ops)
-    meta["note"] = (meta.get("note", "").split(" | ")[0]
-                    + " | срез native-PO использует те же параметры (не перефитим, чтобы шкала λ "
-                      "была сравнима между корпусами)")
+    meta["note"] = ("пер-типовый univariate Hawkes MLE (μ,α,β на тип) на union-событиях старого "
+                    "корпуса вьюера, снятого с публикации 2026-08-13; параметры зафиксированы и "
+                    "не перефитятся, чтобы шкала λ среза native-PO осталась сравнимой с уже "
+                    "посчитанной; λ(s)=Σ_t λ_t(s); развилки = branch/backtrack/failed_attempt")
     json.dump(meta, open(meta_path, "w"), ensure_ascii=False, indent=1)
 
     print(f"native-PO: трасс {n_traces} (исключено GPQA {n_dropped_gpqa}), конфликт-сайтов {len(sites_out)}")

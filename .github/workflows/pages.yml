@@ -34,8 +34,13 @@ jobs:
           npm run check
           npm test
           python build/validate_data.py
-          python build/check_no_gpqa.py
           rm -rf node_modules
+      # Гейт выкладки: снимок не публикуется, если в нём нашлось хоть что-то из закрытого
+      # GPQA-diamond. Проверяется весь снимок, а не отдельный срез. Эталоны (сам бенчмарк и
+      # исходный корпус) лежат вне репозитория, поэтому здесь работает структурная часть:
+      # имена файлов, поля бенчмарка, принадлежность каждой трассы срезу native-PO.
+      - name: Запрет публикации GPQA
+        run: python build/check_no_gpqa.py
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -1,100 +1,59 @@
 {
- "traces_processed": 5631,
- "sites_total": 254498,
- "sites_in_viewer": 16103,
- "traces_in_viewer": 1893,
- "stale_traces_removed": 0,
- "off_domain_events_dropped": 8,
- "by_priority": {
-  "prio4": 34913,
-  "prio1": 111638,
-  "prio3": 103907,
-  "prio2": 4040
+ "corpus": "native_po_2026_08_11",
+ "slice": "npoJ",
+ "judge_model": "deepseek-chat",
+ "agents": [
+  "regex",
+  "judge"
+ ],
+ "traces_in_viewer": 1022,
+ "sites_in_viewer": 10103,
+ "traces_dropped_gpqa": 136,
+ "benchmarks": {
+  "bbh": 550,
+  "math500": 472
  },
- "per_agent_site_participation": {
-  "regex": 254498,
-  "deepseek": 254498,
-  "r1": 42026,
-  "claude": 213586,
-  "qwen": 189840
+ "by_kind": {
+  "judge_only": 4529,
+  "regex_only": 3094,
+  "type_mismatch": 2480
  },
- "slices_traces": {
-  "DR": 269,
-  "CDQ": 1684,
-  "CD": 356,
-  "DQ": 1080,
-  "DQR": 2093,
-  "CDQR": 484,
-  "CDR": 31,
-  "D": 109
+ "by_model": {
+  "npo-gpt-oss-20b": 744,
+  "npo-gpt-oss-120b": 648,
+  "npo-Qwen3-8B": 1606,
+  "npo-Qwen3-4B": 1547,
+  "npo-Qwen3.5-122B-A10B": 2830,
+  "npo-R1-Distill-Qwen-7B": 870,
+  "npo-R1-Distill-Llama-8B": 995,
+  "npo-R1-Distill-Llama-70B": 863
  },
- "slices_sites_selected": {
-  "CD": 1031,
-  "CDQ": 2072,
-  "CDQR": 604,
-  "CDR": 323,
-  "DQ": 442,
-  "DQR": 851,
-  "DR": 377,
-  "D": 300
+ "by_type": {
+  "subgoal_done": 4639,
+  "commit": 2125,
+  "backtrack": 2832,
+  "branch": 1109,
+  "failed_attempt": 330,
+  "verify": 2496
  },
- "note": "срез = множество LLM-агентов трассы (C=Claude, D=DeepSeek, Q=Qwen; regex везде); 4-way CDQ непуст после полного Qwen-прогона корпуса",
- "nativepo": {
-  "corpus": "native_po_2026_08_11",
-  "slice": "npoJ",
-  "judge_model": "deepseek-chat",
-  "agents": [
-   "regex",
-   "judge"
-  ],
-  "traces": 1022,
-  "sites": 10103,
-  "traces_dropped_gpqa": 136,
-  "benchmarks": {
-   "bbh": 550,
-   "math500": 472
-  },
-  "by_kind": {
-   "judge_only": 4529,
-   "regex_only": 3094,
-   "type_mismatch": 2480
-  },
-  "by_model": {
-   "npo-gpt-oss-20b": 744,
-   "npo-gpt-oss-120b": 648,
-   "npo-Qwen3-8B": 1606,
-   "npo-Qwen3-4B": 1547,
-   "npo-Qwen3.5-122B-A10B": 2830,
-   "npo-R1-Distill-Qwen-7B": 870,
-   "npo-R1-Distill-Llama-8B": 995,
-   "npo-R1-Distill-Llama-70B": 863
-  },
-  "by_type": {
-   "subgoal_done": 4639,
-   "commit": 2125,
-   "backtrack": 2832,
-   "branch": 1109,
-   "failed_attempt": 330,
-   "verify": 2496
-  },
-  "judge_events": {
-   "subgoal_done": 4012,
-   "commit": 1337,
-   "backtrack": 1477,
-   "branch": 931,
-   "failed_attempt": 256,
-   "verify": 1888
-  },
-  "regex_events": {
-   "commit": 1445,
-   "subgoal_done": 1983,
-   "failed_attempt": 120,
-   "branch": 614,
-   "verify": 1831,
-   "backtrack": 3458
-  },
-  "event_drops": {},
-  "span_drops": {},
-  "note": "срез судья-против-регулярок на восьми моделях одного корпуса; GPQA-diamond исключён целиком (закрытый доступ), остаются MATH500 и BBH"
- }
+ "judge_events": {
+  "subgoal_done": 4012,
+  "commit": 1337,
+  "backtrack": 1477,
+  "branch": 931,
+  "failed_attempt": 256,
+  "verify": 1888
+ },
+ "regex_events": {
+  "commit": 1445,
+  "subgoal_done": 1983,
+  "failed_attempt": 120,
+  "branch": 614,
+  "verify": 1831,
+  "backtrack": 3458
+ },
+ "event_drops": {},
+ "span_drops": {},
+ "note": "срез судья-против-регулярок на восьми моделях одного корпуса; GPQA-diamond исключён целиком (закрытый доступ), остаются MATH500 и BBH",
+ "archived_2026_08_13": "старый конфликт-корпус вьюера — 871 трасса моделей gemma-4-26b-a4b-it-nitro, gpt-oss-20b, qwen3.6-35b-a3b-nitro, агенты Claude/DeepSeek/Qwen/DeepSeek-R1, срезы CDQ/CD/DQ/DQR/CDQR/CDR/DR/D, 6000 конфликт-сайтов — снят с публикации 2026-08-13 и унесён в приватный архив internal_signals_poc/toloka_archive_2026_08_13: он публиковал 170 трасс закрытого GPQA-diamond. Верифицируется людьми только срез native-PO"
 }

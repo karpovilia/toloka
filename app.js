@@ -10,8 +10,8 @@ const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 const el = (t, cls, txt) => { const e = document.createElement(t); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
 
-const AGENT_COLOR = { regex: "#f76b15", claude: "#d97757", deepseek: "#4c8dff", qwen: "#8e4ec6", r1: "#e5484d", judge: "#12a594" };
-const AGENT_LABEL = { regex: "regex", claude: "Claude", deepseek: "DeepSeek", qwen: "Qwen", r1: "DeepSeek-R1", judge: "судья DeepSeek" };
+const AGENT_COLOR = { regex: "#f76b15", judge: "#12a594" };
+const AGENT_LABEL = { regex: "regex", judge: "судья DeepSeek" };
 const PALETTE = ["#e5484d", "#30a46c", "#8e4ec6", "#0091ff", "#f76b15", "#ffb224", "#12a594", "#e93d82", "#6e56cf", "#46a758", "#d6409f", "#5b5bd6"];
 const OP_COLOR = { SETUP: "#6e56cf", DERIVING: "#4c8dff", EXPLORING: "#f76b15", VERIFYING: "#12a594", REVISING: "#e5484d", CONCLUDING: "#46a758", GROUNDING: "#8e4ec6" };
 const FORK = { branch: "◇", backtrack: "◄", failed_attempt: "✗" };

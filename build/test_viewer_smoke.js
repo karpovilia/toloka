@@ -19,16 +19,16 @@ function trace(tf, agents, events) {
   const segments = []; for (let i = 0; i <= maxs; i++) segments.push({ seg_id: i, text: "seg " + i });
   const spans = [{ a: 0, b: Math.ceil(maxs / 2), op: "DERIVING" }, { a: Math.ceil(maxs / 2), b: maxs + 1, op: "CONCLUDING" }];
   const lam = segments.map(() => 0.3);
-  return { cell: tf.replace(".json", ""), question_id: tf, benchmark: "gpqa_diamond", domain: "M", segments, events, spans, lam, agents };
+  return { cell: tf.replace(".json", ""), question_id: tf, benchmark: "math500", domain: "M", segments, events, spans, lam, agents };
 }
-const T1 = trace("t1.json", ["regex", "claude", "deepseek"], [
-  { s: 3, t: "backtrack", a: "claude" }, { s: 3, t: "backtrack", a: "deepseek" },
-  { s: 8, t: "verify", a: "regex" }, { s: 12, t: "commit", a: "claude" }]);   // 3 кандидата
-const T2 = trace("t2.json", ["regex", "qwen"], [
-  { s: 2, t: "backtrack", a: "qwen" }, { s: 2, t: "backtrack", a: "regex" }]);   // 1 кандидат
+const T1 = trace("t1.json", ["regex", "judge"], [
+  { s: 3, t: "backtrack", a: "judge" }, { s: 3, t: "backtrack", a: "regex" },
+  { s: 8, t: "verify", a: "regex" }, { s: 12, t: "commit", a: "judge" }]);   // 3 кандидата
+const T2 = trace("t2.json", ["regex", "judge"], [
+  { s: 2, t: "backtrack", a: "judge" }, { s: 2, t: "backtrack", a: "regex" }]);   // 1 кандидат
 const INDEX = [
-  { trace_file: "t1.json", cell: "gemma__gpqa_diamond", question_id: "q1", benchmark: "gpqa_diamond", domain: "M", model: "gemma", slice: "A", n_segments: T1.segments.length, n_events: 4, n_candidates: 3, agents: T1.agents },
-  { trace_file: "t2.json", cell: "gptoss__gpqa_diamond", question_id: "q2", benchmark: "gpqa_diamond", domain: "M", model: "gptoss", slice: "B", n_segments: T2.segments.length, n_events: 2, n_candidates: 1, agents: T2.agents },
+  { trace_file: "t1.json", cell: "npo-a__math500", question_id: "q1", benchmark: "math500", domain: "M", model: "npo-a", slice: "npoJ", n_segments: T1.segments.length, n_events: 4, n_candidates: 3, agents: T1.agents },
+  { trace_file: "t2.json", cell: "npo-b__math500", question_id: "q2", benchmark: "math500", domain: "M", model: "npo-b", slice: "npoJ", n_segments: T2.segments.length, n_events: 2, n_candidates: 1, agents: T2.agents },
 ];
 const CFG = { event_types: "ET", traces_index: "IX", traces_dir: "data/traces", trace_maps_meta: "MM" };
 const routes = { "config.json": CFG, "ET": ET, "IX": INDEX, "MM": MM, "t1.json": T1, "t2.json": T2 };
@@ -112,13 +112,13 @@ setTimeout(() => {
   $("#exportAnnot").click();
   ok(lastExport === "annot_ki.json", "экспорт: " + lastExport);
   // 7) deep-link на скрытую фильтром t2 должен сбросить фильтры
-  $("#fModel").value = "gemma"; $("#fModel").dispatchEvent(new window.Event("change"));
+  $("#fModel").value = "npo-a"; $("#fModel").dispatchEvent(new window.Event("change"));
   ok($("#filterCount").textContent.includes("1 из 2"), "фильтр скрыл t2");
   window.location.hash = "#trace=t2.json";
   window.dispatchEvent(new window.Event("hashchange"));
   setTimeout(() => {
     ok($("#qLabel").textContent.includes("q2"), "deep-link открыл t2: " + $("#qLabel").textContent.slice(0, 40));
-    ok($$("#traceBody .ev").length === 1, "t2: 1 кандидат (regex+qwen merged): " + $$("#traceBody .ev").length);
+    ok($$("#traceBody .ev").length === 1, "t2: 1 кандидат (regex+судья merged): " + $$("#traceBody .ev").length);
     ok($("#fModel").value === "", "deep-link сбросил несовместимый фильтр");
     // app.js в strict-режиме, его функции не видны снаружи — проверяем поведением:
     // битый percent-escape не должен ронять обработчик hashchange (URIError у decodeURIComponent).

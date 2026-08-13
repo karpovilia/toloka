@@ -21,7 +21,7 @@ confirmed = ✓; rejected = ✗; retyped = <тип> (событие реальн
 import json, glob, os, math, argparse
 from collections import Counter, defaultdict
 
-AGENTS = ["regex", "claude", "deepseek", "qwen", "r1", "judge"]
+AGENTS = ["regex", "judge"]     # снимок = срез native-PO; агенты старого корпуса в архиве
 CONFIRM, REJECT = "✓", "✗"
 TOL = 1
 
